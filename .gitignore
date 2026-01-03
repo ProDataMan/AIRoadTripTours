@@ -1,0 +1,25 @@
+.DS_Store
+/.build
+/Packages
+xcuserdata/
+DerivedData/
+.swiftpm/configuration/registries.json
+.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
+.netrc
+
+# Xcode - Ignore most xcodeproj content but keep shared data
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+*.xcworkspace/*
+!*.xcworkspace/contents.xcworkspacedata
+!*.xcworkspace/xcshareddata/
+
+# Xcode workspace data in source directories (created by Xcode when opening projects)
+AIRoadTripToursIOSApp/*.xcodeproj/
+
+# iOS App Build Products
+*.app
+*.ipa
+*.dSYM.zip
+*.dSYM

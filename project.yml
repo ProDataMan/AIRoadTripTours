@@ -1,0 +1,53 @@
+name: AIRoadTripToursIOSApp
+
+options:
+  bundleIdPrefix: com.airoadtriptours
+  deploymentTarget:
+    iOS: 17.0
+
+packages:
+  AIRoadTripTours:
+    path: .
+    group: Packages
+
+targets:
+  AIRoadTripToursIOSApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: AIRoadTripToursIOSApp/AIRoadTripToursIOSAppApp.swift
+    dependencies:
+      - package: AIRoadTripTours
+        product: AIRoadTripToursApp
+        link: true
+    info:
+      path: AIRoadTripToursIOSApp/Info.plist
+      properties:
+        CFBundleDevelopmentRegion: en
+        CFBundleDisplayName: AI Road Trip Tours
+        CFBundleExecutable: $(EXECUTABLE_NAME)
+        CFBundleIdentifier: $(PRODUCT_BUNDLE_IDENTIFIER)
+        CFBundleInfoDictionaryVersion: "6.0"
+        CFBundleName: $(PRODUCT_NAME)
+        CFBundlePackageType: APPL
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        NSLocationWhenInUseUsageDescription: "We need your location to find nearby points of interest and create personalized audio tours for your road trip."
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIRequiredDeviceCapabilities:
+          - arm64
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.airoadtriptours.AIRoadTripToursIOSApp
+        MARKETING_VERSION: 1.0.0
+        CURRENT_PROJECT_VERSION: 1
+        SWIFT_VERSION: 6.0
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+        GENERATE_INFOPLIST_FILE: YES
