@@ -197,7 +197,9 @@ public class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelega
 
     private func createMapTemplate() -> CPMapTemplate {
         let mapTemplate = CPMapTemplate()
-        mapTemplate.showPanningInterface = false
+
+        // showPanningInterface is not available in this iOS version
+        // Panning is controlled by CarPlay automatically
 
         // Add trip preview if we have POIs
         if let appState = appState, !appState.selectedPOIs.isEmpty {
