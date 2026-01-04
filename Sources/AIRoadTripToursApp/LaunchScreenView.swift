@@ -37,26 +37,41 @@ public struct LaunchScreenView: View {
     }
 
     private func setupPlayer() {
-        guard let videoURL = Bundle.main.url(forResource: "LaunchVideo", withExtension: "mp4") else {
-            print("Video not found in bundle")
-            return
-        }
+        print("LaunchScreenView: Setting up player...")
 
-        let player = AVPlayer(url: videoURL)
-        player.isMuted = true
-        player.play()
+        // Try to find the video
+        if let videoURL = Bundle.main.url(forResource: "LaunchVideo", withExtension: "mp4") {
+            print("LaunchScreenView: Video found at \(videoURL)")
 
-        // Loop the video
-        NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemDidPlayToEndTime,
-            object: player.currentItem,
-            queue: .main
-        ) { _ in
-            player.seek(to: .zero)
+            let player = AVPlayer(url: videoURL)
+            player.isMuted = true
             player.play()
-        }
 
-        self.player = player
+            // Loop the video
+            NotificationCenter.default.addObserver(
+                forName: .AVPlayerItemDidPlayToEndTime,
+                object: player.currentItem,
+                queue: .main
+            ) { _ in
+                player.seek(to: .zero)
+                player.play()
+            }
+
+            self.player = player
+        } else {
+            print("LaunchScreenView: Video not found in bundle")
+
+            // List all resources to debug
+            if let resourcePath = Bundle.main.resourcePath {
+                print("LaunchScreenView: Resource path: \(resourcePath)")
+                do {
+                    let contents = try FileManager.default.contentsOfDirectory(atPath: resourcePath)
+                    print("LaunchScreenView: Bundle contents: \(contents.filter { $0.hasSuffix(".mp4") })")
+                } catch {
+                    print("LaunchScreenView: Error listing bundle contents: \(error)")
+                }
+            }
+        }
     }
 }
 

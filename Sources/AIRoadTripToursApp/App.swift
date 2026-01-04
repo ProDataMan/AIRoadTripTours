@@ -16,7 +16,7 @@ import CarPlay
 /// 6. Add UIApplicationSceneManifest to Info.plist with CarPlay scene configuration
 public struct AIRoadTripApp: App {
     @State private var appState = AppState()
-    @State private var showLaunchScreen = true
+    @State private var showLaunchScreen = false  // Disabled by default until video is properly added
 
     #if canImport(CarPlay)
     @available(iOS 14.0, *)
@@ -32,6 +32,7 @@ public struct AIRoadTripApp: App {
                     .environment(appState)
                     .onAppear {
                         setupCarPlay()
+                        print("ContentView appeared")
                     }
 
                 if showLaunchScreen {
@@ -41,8 +42,10 @@ public struct AIRoadTripApp: App {
                 }
             }
             .onAppear {
+                print("WindowGroup appeared, showLaunchScreen: \(showLaunchScreen)")
                 // Always dismiss launch screen after 3 seconds
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                    print("Timer fired, dismissing launch screen")
                     withAnimation(.easeOut(duration: 0.5)) {
                         showLaunchScreen = false
                     }
