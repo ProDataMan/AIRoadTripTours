@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -12,7 +12,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		11B891B6310B6D295651FF5A /* AIRoadTripToursIOSApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AIRoadTripToursIOSApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		11B891B6310B6D295651FF5A /* AIRoadTripToursIOSApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AIRoadTripToursIOSApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7054F85A0924BB6334922B13 /* AIRoadTripTours */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AIRoadTripTours; path = .; sourceTree = SOURCE_ROOT; };
 		EE3C5D7F0E96683915AFD187 /* AIRoadTripToursIOSAppApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIRoadTripToursIOSAppApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -106,7 +106,6 @@
 			packageReferences = (
 				A8B526125F1704C4C7B4AB6E /* XCLocalSwiftPackageReference "." */,
 			);
-			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -135,6 +134,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphonesimulator*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = W847KX499X;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = AIRoadTripToursIOSApp/Info.plist;
@@ -278,6 +278,7 @@
 				"CODE_SIGN_IDENTITY[sdk=iphonesimulator*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = W847KX499X;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = AIRoadTripToursIOSApp/Info.plist;

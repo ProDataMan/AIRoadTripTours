@@ -16,6 +16,7 @@ import CarPlay
 /// 6. Add UIApplicationSceneManifest to Info.plist with CarPlay scene configuration
 public struct AIRoadTripApp: App {
     @State private var appState = AppState()
+    @State private var showLaunchScreen = true
 
     #if canImport(CarPlay)
     @available(iOS 14.0, *)
@@ -26,11 +27,26 @@ public struct AIRoadTripApp: App {
 
     public var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environment(appState)
-                .onAppear {
-                    setupCarPlay()
+            ZStack {
+                ContentView()
+                    .environment(appState)
+                    .onAppear {
+                        setupCarPlay()
+                    }
+
+                if showLaunchScreen {
+                    LaunchScreenView()
+                        .transition(.opacity)
+                        .zIndex(1)
+                        .onAppear {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                                withAnimation(.easeOut(duration: 0.5)) {
+                                    showLaunchScreen = false
+                                }
+                            }
+                        }
                 }
+            }
         }
 
         #if canImport(CarPlay)
