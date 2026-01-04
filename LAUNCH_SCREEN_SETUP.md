@@ -1,27 +1,34 @@
 # Launch Screen and App Icon Setup
 
-This document describes how to complete the launch screen video and app icon setup for the AI Road Trip Tours iOS app.
+This document describes the launch screen video and app icon setup for the AI Road Trip Tours iOS app.
 
 ## Launch Screen Video
 
-The launch screen now displays `AIRoadTripTours.mp4` when the app launches.
+The launch screen displays `LaunchVideo.mp4` when the app launches.
 
 ### Setup Complete
-- ✅ Video copied to `AIRoadTripToursIOSApp/Resources/LaunchVideo.mp4`
+
+- ✅ Video added to `AIRoadTripToursIOSApp/LaunchVideo.mp4`
+- ✅ Video properly configured in Xcode project file (Copy Bundle Resources)
 - ✅ `LaunchScreenView.swift` created to display the video
-- ✅ `App.swift` updated to show launch screen for 3 seconds with fade transition
+- ✅ `App.swift` updated with async initialization and 10-second launch screen
+- ✅ Video plays once and holds on final frame (app icon) until timer completes
 
-### Xcode Configuration Required
+### How It Works
 
-Open the Xcode project and add the video file to the target:
+1. Launch screen appears immediately when app starts
+2. Video plays muted, holds on final frame (no loop)
+3. App initializes in background using async/await
+4. Launch screen stays visible for minimum 10 seconds
+5. Smooth 0.8s fade transition reveals the app
+6. Fallback UI (map icon + text) displays if video fails to load
 
-1. Open `AIRoadTripToursIOSApp.xcodeproj` in Xcode
-2. In the Project Navigator, right-click on the `AIRoadTripToursIOSApp` folder
-3. Select "Add Files to AIRoadTripToursIOSApp..."
-4. Navigate to `AIRoadTripToursIOSApp/Resources/LaunchVideo.mp4`
-5. Check "Copy items if needed"
-6. Check "Add to targets: AIRoadTripToursIOSApp"
-7. Click "Add"
+### Performance Optimizations
+
+- POI repository lazy-loaded to defer expensive MapKit initialization
+- AppState initializes quickly (under 1 second)
+- Heavy services only created when first accessed
+- Background initialization while launch screen displays
 
 ## App Icon Setup
 
