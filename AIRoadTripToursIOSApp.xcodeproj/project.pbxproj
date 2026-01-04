@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		12EEA451FC8D4442AC4338F3 /* LaunchVideo.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 4759113A351E423FA81AE2FB /* LaunchVideo.mp4 */; };
 		6725AF1D007782CC40CF79E5 /* AIRoadTripToursApp in Frameworks */ = {isa = PBXBuildFile; productRef = 75525C2C01EFE368734231FA /* AIRoadTripToursApp */; };
+		DAA28A127D0D461683F5BFFA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 99ADB7102F0AE77200390573 /* Assets.xcassets */; };
 		F179499F66CDC18347120F90 /* AIRoadTripToursIOSAppApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE3C5D7F0E96683915AFD187 /* AIRoadTripToursIOSAppApp.swift */; };
 /* End PBXBuildFile section */
 
@@ -126,6 +127,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				12EEA451FC8D4442AC4338F3 /* LaunchVideo.mp4 in Resources */,
+				DAA28A127D0D461683F5BFFA /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
