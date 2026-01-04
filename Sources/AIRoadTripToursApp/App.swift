@@ -5,77 +5,31 @@ import AIRoadTripToursServices
 import CarPlay
 #endif
 
-/// Main iOS app structure.
-///
-/// To use this in an Xcode iOS app project:
-/// 1. Create a new iOS App in Xcode
-/// 2. Add this package as a dependency
-/// 3. Import AIRoadTripToursApp in your app file
-/// 4. Use AIRoadTripApp as your @main App
-/// 5. Add CarPlay entitlement in Xcode project settings
-/// 6. Add UIApplicationSceneManifest to Info.plist with CarPlay scene configuration
+/// Minimal app structure for debugging.
 public struct AIRoadTripApp: App {
-    @State private var appState = AppState()
-    @State private var showLaunchScreen = true
-
-    #if canImport(CarPlay)
-    @available(iOS 14.0, *)
-    private static var carPlaySceneDelegate = CarPlaySceneDelegate()
-    #endif
-
-    public init() {}
+    public init() {
+        print("AIRoadTripApp: Initializing")
+    }
 
     public var body: some Scene {
         WindowGroup {
-            ZStack {
-                // ALWAYS render ContentView - never conditionally hide it
-                ContentView()
-                    .environment(appState)
-                    .opacity(showLaunchScreen ? 0 : 1)
-                    .onAppear {
-                        print("ContentView appeared - dismissing launch screen in 1 second")
-                        // Once ContentView appears, wait briefly then dismiss launch screen
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                            print("Dismissing launch screen now")
-                            withAnimation(.easeOut(duration: 0.5)) {
-                                showLaunchScreen = false
-                            }
-                            print("Launch screen dismissed")
-                        }
+            VStack(spacing: 20) {
+                Text("AI Road Trip Tours")
+                    .font(.largeTitle)
+                    .bold()
 
-                        // Setup CarPlay in background
-                        Task.detached {
-                            await MainActor.run {
-                                setupCarPlay()
-                                print("CarPlay setup completed")
-                            }
-                        }
-                    }
+                Text("App is running!")
+                    .font(.title2)
 
-                // Launch screen on top, fades out
-                if showLaunchScreen {
-                    LaunchScreenView()
-                        .transition(.opacity)
-                        .zIndex(1)
-                }
+                Image(systemName: "car.fill")
+                    .font(.system(size: 60))
+                    .foregroundColor(.blue)
+            }
+            .padding()
+            .onAppear {
+                print("Main view appeared - app is working")
             }
         }
-
-        #if canImport(CarPlay)
-        if #available(iOS 14.0, *) {
-            CPTemplateApplicationScene(connectHandler: { scene in
-                Self.carPlaySceneDelegate.setAppState(appState)
-            })
-        }
-        #endif
-    }
-
-    private func setupCarPlay() {
-        #if canImport(CarPlay)
-        if #available(iOS 14.0, *) {
-            Self.carPlaySceneDelegate.setAppState(appState)
-        }
-        #endif
     }
 }
 
