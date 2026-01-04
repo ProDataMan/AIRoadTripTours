@@ -4,47 +4,53 @@ import AIRoadTripToursServices
 
 /// Main iOS app structure.
 public struct AIRoadTripApp: App {
-    @State private var appState: AppState?
-    @State private var showLaunchScreen = true
-
-    public init() {
-        print("AIRoadTripApp: Initializing")
-    }
+    public init() {}
 
     public var body: some Scene {
         WindowGroup {
-            ZStack {
-                // Show launch screen until AppState is ready
-                if let appState = appState {
-                    // Main app - rendered after AppState loads
-                    ContentView()
-                        .environment(appState)
-                        .onAppear {
-                            print("ContentView appeared")
-                            // Dismiss launch screen after brief delay
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                                withAnimation(.easeOut(duration: 0.8)) {
-                                    showLaunchScreen = false
-                                }
-                            }
-                        }
-                        .opacity(showLaunchScreen ? 0 : 1)
-                }
+            LoadingView()
+        }
+    }
+}
 
-                // Launch screen overlay
-                if showLaunchScreen {
-                    LaunchScreenView()
-                        .transition(.opacity)
-                        .zIndex(1)
-                }
+struct LoadingView: View {
+    @State private var appState: AppState?
+    @State private var showLaunchScreen = true
+
+    var body: some View {
+        ZStack {
+            // Main content
+            if let appState = appState {
+                ContentView()
+                    .environment(appState)
+                    .opacity(showLaunchScreen ? 0 : 1)
             }
-            .task {
-                // Initialize AppState in background while launch screen shows
-                print("Starting AppState initialization in background...")
+
+            // Launch screen - always shows first
+            if showLaunchScreen {
+                LaunchScreenView()
+                    .zIndex(999)
+            }
+        }
+        .onAppear {
+            print("LoadingView appeared - starting initialization")
+
+            // Initialize AppState in background
+            Task.detached(priority: .userInitiated) {
+                print("Creating AppState...")
                 let state = AppState()
+
                 await MainActor.run {
+                    print("AppState created, assigning...")
                     self.appState = state
-                    print("AppState ready and assigned")
+
+                    // Wait 2 seconds then dismiss launch screen
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        print("Dismissing launch screen")
+                        withAnimation(.easeOut(duration: 0.8)) {
+                            showLaunchScreen = false
+                        }
+                    }
                 }
             }
         }
