@@ -1,28 +1,32 @@
 import SwiftUI
 
-/// Launch screen with static app icon.
+/// Launch screen with app branding.
 public struct LaunchScreenView: View {
     public init() {}
 
     public var body: some View {
         ZStack {
+            // Black background
             Color.black
                 .ignoresSafeArea()
 
-            // Static app icon for now - video playback is blocking
-            VStack(spacing: 20) {
+            // App branding
+            VStack(spacing: 30) {
                 Image(systemName: "car.fill")
                     .font(.system(size: 100))
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.blue, .cyan],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
 
                 Text("AI Road Trip Tours")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
+                    .font(.system(size: 40, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
             }
-        }
-        .onAppear {
-            print("LaunchScreenView: Appeared")
         }
     }
 }

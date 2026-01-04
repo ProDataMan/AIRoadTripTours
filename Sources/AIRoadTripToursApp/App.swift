@@ -5,6 +5,7 @@ import AIRoadTripToursServices
 /// Main iOS app structure.
 public struct AIRoadTripApp: App {
     @State private var appState = AppState()
+    @State private var showLaunchScreen = true
 
     public init() {
         print("AIRoadTripApp: Initializing")
@@ -12,11 +13,27 @@ public struct AIRoadTripApp: App {
 
     public var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environment(appState)
-                .onAppear {
-                    print("ContentView appeared")
+            ZStack {
+                // Main app - always rendered
+                ContentView()
+                    .environment(appState)
+                    .onAppear {
+                        print("ContentView appeared")
+                        // Dismiss launch screen after brief delay
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                            withAnimation(.easeOut(duration: 0.8)) {
+                                showLaunchScreen = false
+                            }
+                        }
+                    }
+
+                // Launch screen overlay
+                if showLaunchScreen {
+                    LaunchScreenView()
+                        .transition(.opacity)
+                        .zIndex(1)
                 }
+            }
         }
     }
 }
