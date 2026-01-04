@@ -20,10 +20,6 @@
 		EE3C5D7F0E96683915AFD187 /* AIRoadTripToursIOSAppApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIRoadTripToursIOSAppApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileSystemSynchronizedRootGroup section */
-		99ADB7172F0AF0DD00390573 /* Resources */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Resources; sourceTree = "<group>"; };
-/* End PBXFileSystemSynchronizedRootGroup section */
-
 /* Begin PBXFrameworksBuildPhase section */
 		95A7FD98A59EB733D0597DD9 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
@@ -47,7 +43,6 @@
 		3DBFC8870D6D10B2AC72701D = {
 			isa = PBXGroup;
 			children = (
-				99ADB7172F0AF0DD00390573 /* Resources */,
 				99ADB7102F0AE77200390573 /* Assets.xcassets */,
 				49C548138A2B0BCBE9C418AC /* AIRoadTripToursIOSApp */,
 				026B2D686C2468ABAB7DB6B9 /* Packages */,
@@ -86,9 +81,6 @@
 			buildRules = (
 			);
 			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				99ADB7172F0AF0DD00390573 /* Resources */,
 			);
 			name = AIRoadTripToursIOSApp;
 			packageProductDependencies = (
