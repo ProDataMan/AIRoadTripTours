@@ -13,7 +13,17 @@ public final class AppState {
     /// POIs selected by the user for the audio tour
     public var selectedPOIs: Set<POI> = []
 
-    public let poiRepository: POIRepository
+    // Lazy-loaded repositories for faster startup
+    private var _poiRepository: POIRepository?
+    public var poiRepository: POIRepository {
+        if let repo = _poiRepository {
+            return repo
+        }
+        let repo = createPOIRepository()
+        _poiRepository = repo
+        return repo
+    }
+
     public let rangeEstimator: RangeEstimator
     private let storage: OnboardingStorage
     public let favoritesStorage = FavoritePOIsStorage()
@@ -27,25 +37,41 @@ public final class AppState {
     }
 
     public init() {
-        // Initialize storage
+        print("AppState: Initializing...")
+        let startTime = Date()
+
+        // Initialize storage - fast
         self.storage = OnboardingStorage()
-
-        // Use live MapKit data for POI discovery
-        #if canImport(MapKit)
-        if #available(iOS 17.0, macOS 14.0, *) {
-            self.poiRepository = MapKitPOIService()
-        } else {
-            // Fallback to in-memory for older OS versions
-            self.poiRepository = InMemoryPOIRepository(initialPOIs: Self.fallbackPOIs)
-        }
-        #else
-        self.poiRepository = InMemoryPOIRepository(initialPOIs: Self.fallbackPOIs)
-        #endif
-
         self.rangeEstimator = SimpleRangeEstimator()
 
-        // Load saved onboarding data
+        // Load saved onboarding data - fast
         loadOnboardingData()
+
+        // Defer POI repository creation until first access
+        // This avoids MapKit initialization during app launch
+
+        let elapsed = Date().timeIntervalSince(startTime)
+        print("AppState: Initialized in \(elapsed) seconds")
+    }
+
+    private func createPOIRepository() -> POIRepository {
+        print("AppState: Creating POI repository...")
+        let startTime = Date()
+
+        let repo: POIRepository
+        #if canImport(MapKit)
+        if #available(iOS 17.0, macOS 14.0, *) {
+            repo = MapKitPOIService()
+        } else {
+            repo = InMemoryPOIRepository(initialPOIs: Self.fallbackPOIs)
+        }
+        #else
+        repo = InMemoryPOIRepository(initialPOIs: Self.fallbackPOIs)
+        #endif
+
+        let elapsed = Date().timeIntervalSince(startTime)
+        print("AppState: POI repository created in \(elapsed) seconds")
+        return repo
     }
 
     // Fallback POIs for older OS versions or non-iOS platforms

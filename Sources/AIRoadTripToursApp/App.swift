@@ -16,7 +16,8 @@ import CarPlay
 /// 6. Add UIApplicationSceneManifest to Info.plist with CarPlay scene configuration
 public struct AIRoadTripApp: App {
     @State private var appState = AppState()
-    @State private var showLaunchScreen = false  // Disabled by default until video is properly added
+    @State private var showLaunchScreen = true  // Enabled to cover loading time
+    @State private var isAppReady = false
 
     #if canImport(CarPlay)
     @available(iOS 14.0, *)
@@ -28,12 +29,17 @@ public struct AIRoadTripApp: App {
     public var body: some Scene {
         WindowGroup {
             ZStack {
-                ContentView()
-                    .environment(appState)
-                    .onAppear {
-                        setupCarPlay()
-                        print("ContentView appeared")
-                    }
+                if isAppReady {
+                    ContentView()
+                        .environment(appState)
+                        .onAppear {
+                            setupCarPlay()
+                            print("ContentView appeared")
+                        }
+                } else {
+                    // Show loading placeholder while app initializes
+                    Color.black.ignoresSafeArea()
+                }
 
                 if showLaunchScreen {
                     LaunchScreenView()
@@ -41,15 +47,9 @@ public struct AIRoadTripApp: App {
                         .zIndex(1)
                 }
             }
-            .onAppear {
-                print("WindowGroup appeared, showLaunchScreen: \(showLaunchScreen)")
-                // Always dismiss launch screen after 3 seconds
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                    print("Timer fired, dismissing launch screen")
-                    withAnimation(.easeOut(duration: 0.5)) {
-                        showLaunchScreen = false
-                    }
-                }
+            .task {
+                // Initialize app in background while launch screen plays
+                await initializeApp()
             }
         }
 
@@ -60,6 +60,39 @@ public struct AIRoadTripApp: App {
             })
         }
         #endif
+    }
+
+    private func initializeApp() async {
+        print("App initialization started...")
+        let startTime = Date()
+
+        // Simulate/perform any heavy initialization here
+        // The AppState init is already called, but we can do additional setup
+        try? await Task.sleep(for: .seconds(1)) // Minimum time to ensure smooth experience
+
+        print("App initialization completed in \(Date().timeIntervalSince(startTime)) seconds")
+
+        // Mark app as ready
+        await MainActor.run {
+            isAppReady = true
+        }
+
+        // Keep launch screen visible for at least 10 seconds total
+        let elapsedTime = Date().timeIntervalSince(startTime)
+        let remainingTime = max(0, 10.0 - elapsedTime)
+
+        if remainingTime > 0 {
+            print("Waiting \(remainingTime) more seconds for minimum launch screen duration...")
+            try? await Task.sleep(for: .seconds(remainingTime))
+        }
+
+        // Dismiss launch screen with animation
+        await MainActor.run {
+            print("Dismissing launch screen")
+            withAnimation(.easeOut(duration: 0.8)) {
+                showLaunchScreen = false
+            }
+        }
     }
 
     private func setupCarPlay() {
