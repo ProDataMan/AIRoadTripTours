@@ -29,9 +29,11 @@ public struct AIRoadTripApp: App {
     public var body: some Scene {
         WindowGroup {
             ZStack {
+                // Always show ContentView when ready, even if launch screen is visible
                 if isAppReady {
                     ContentView()
                         .environment(appState)
+                        .opacity(showLaunchScreen ? 0 : 1)
                         .onAppear {
                             print("ContentView appeared - about to setup CarPlay")
                             // Defer CarPlay setup to avoid blocking main thread
@@ -42,11 +44,9 @@ public struct AIRoadTripApp: App {
                                 }
                             }
                         }
-                } else {
-                    // Show loading placeholder while app initializes
-                    Color.black.ignoresSafeArea()
                 }
 
+                // Launch screen on top, fades out
                 if showLaunchScreen {
                     LaunchScreenView()
                         .transition(.opacity)
