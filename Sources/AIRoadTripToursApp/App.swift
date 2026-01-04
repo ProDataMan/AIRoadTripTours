@@ -36,9 +36,11 @@ struct LoadingView: View {
             print("LoadingView appeared - starting initialization")
 
             // Initialize AppState in background
-            Task.detached(priority: .userInitiated) {
+            Task {
                 print("Creating AppState...")
-                let state = AppState()
+                let state = await MainActor.run {
+                    AppState()
+                }
 
                 await MainActor.run {
                     print("AppState created, assigning...")
