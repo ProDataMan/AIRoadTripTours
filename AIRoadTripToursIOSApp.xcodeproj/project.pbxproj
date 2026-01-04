@@ -15,7 +15,7 @@
 		11B891B6310B6D295651FF5A /* AIRoadTripToursIOSApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AIRoadTripToursIOSApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7054F85A0924BB6334922B13 /* AIRoadTripTours */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AIRoadTripTours; path = .; sourceTree = SOURCE_ROOT; };
 		99ADB7102F0AE77200390573 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		99ADB7132F0AEA5700390573 /* LaunchVideo.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; name = LaunchVideo.mp4; path = AIRoadTripToursIOSApp/Resources/LaunchVideo.mp4; sourceTree = "<group>"; };
+		99ADB7152F0AEE6400390573 /* LaunchVideo.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = LaunchVideo.mp4; sourceTree = "<group>"; };
 		EE3C5D7F0E96683915AFD187 /* AIRoadTripToursIOSAppApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIRoadTripToursIOSAppApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -46,7 +46,7 @@
 				49C548138A2B0BCBE9C418AC /* AIRoadTripToursIOSApp */,
 				026B2D686C2468ABAB7DB6B9 /* Packages */,
 				93B0FC65D26B03813A608C25 /* Products */,
-				99ADB7132F0AEA5700390573 /* LaunchVideo.mp4 */,
+				99ADB7152F0AEE6400390573 /* LaunchVideo.mp4 */,
 			);
 			sourceTree = "<group>";
 		};
