@@ -38,13 +38,14 @@ public struct AIRoadTripApp: App {
                     LaunchScreenView()
                         .transition(.opacity)
                         .zIndex(1)
-                        .onAppear {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                                withAnimation(.easeOut(duration: 0.5)) {
-                                    showLaunchScreen = false
-                                }
-                            }
-                        }
+                }
+            }
+            .onAppear {
+                // Always dismiss launch screen after 3 seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                    withAnimation(.easeOut(duration: 0.5)) {
+                        showLaunchScreen = false
+                    }
                 }
             }
         }
