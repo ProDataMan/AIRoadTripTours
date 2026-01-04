@@ -66,20 +66,16 @@ public struct AIRoadTripApp: App {
         print("App initialization started...")
         let startTime = Date()
 
-        // Simulate/perform any heavy initialization here
-        // The AppState init is already called, but we can do additional setup
-        try? await Task.sleep(for: .seconds(1)) // Minimum time to ensure smooth experience
-
-        print("App initialization completed in \(Date().timeIntervalSince(startTime)) seconds")
-
-        // Mark app as ready
+        // Mark app as ready immediately - no artificial delays
         await MainActor.run {
             isAppReady = true
         }
 
-        // Keep launch screen visible for at least 10 seconds total
+        print("App initialization completed in \(Date().timeIntervalSince(startTime)) seconds")
+
+        // Keep launch screen visible for 5 seconds from start
         let elapsedTime = Date().timeIntervalSince(startTime)
-        let remainingTime = max(0, 10.0 - elapsedTime)
+        let remainingTime = max(0, 5.0 - elapsedTime)
 
         if remainingTime > 0 {
             print("Waiting \(remainingTime) more seconds for minimum launch screen duration...")

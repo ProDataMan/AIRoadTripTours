@@ -1,9 +1,9 @@
 import SwiftUI
 import AVKit
+import AVFoundation
 
 /// Launch screen with animated video.
 public struct LaunchScreenView: View {
-    @State private var isActive = false
     @State private var player: AVPlayer?
 
     public init() {}
@@ -14,8 +14,7 @@ public struct LaunchScreenView: View {
                 .ignoresSafeArea()
 
             if let player = player {
-                VideoPlayer(player: player)
-                    .disabled(true)
+                VideoPlayerView(player: player)
                     .ignoresSafeArea()
             } else {
                 // Fallback if video fails to load
@@ -43,15 +42,22 @@ public struct LaunchScreenView: View {
         if let videoURL = Bundle.main.url(forResource: "LaunchVideo", withExtension: "mp4") {
             print("LaunchScreenView: Video found at \(videoURL)")
 
-            let player = AVPlayer(url: videoURL)
+            let asset = AVAsset(url: videoURL)
+            let playerItem = AVPlayerItem(asset: asset)
+            let player = AVPlayer(playerItem: playerItem)
             player.isMuted = true
-
-            // Set actionAtItemEnd to pause so video holds on final frame
             player.actionAtItemEnd = .pause
 
-            player.play()
+            // Preload the player
+            player.seek(to: .zero)
 
             self.player = player
+
+            // Start playback after a brief delay to ensure view is ready
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                print("LaunchScreenView: Starting playback")
+                player.play()
+            }
         } else {
             print("LaunchScreenView: Video not found in bundle")
 
@@ -66,6 +72,37 @@ public struct LaunchScreenView: View {
                 }
             }
         }
+    }
+}
+
+/// Custom video player view using AVPlayerLayer for better control
+struct VideoPlayerView: UIViewRepresentable {
+    let player: AVPlayer
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.backgroundColor = .black
+
+        let playerLayer = AVPlayerLayer(player: player)
+        playerLayer.videoGravity = .resizeAspectFill
+        playerLayer.frame = UIScreen.main.bounds
+
+        view.layer.addSublayer(playerLayer)
+        context.coordinator.playerLayer = playerLayer
+
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        context.coordinator.playerLayer?.frame = uiView.bounds
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    class Coordinator {
+        var playerLayer: AVPlayerLayer?
     }
 }
 
