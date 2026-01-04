@@ -1,34 +1,22 @@
 import SwiftUI
 import AIRoadTripToursCore
 import AIRoadTripToursServices
-#if canImport(CarPlay)
-import CarPlay
-#endif
 
-/// Minimal app structure for debugging.
+/// Main iOS app structure.
 public struct AIRoadTripApp: App {
+    @State private var appState = AppState()
+
     public init() {
         print("AIRoadTripApp: Initializing")
     }
 
     public var body: some Scene {
         WindowGroup {
-            VStack(spacing: 20) {
-                Text("AI Road Trip Tours")
-                    .font(.largeTitle)
-                    .bold()
-
-                Text("App is running!")
-                    .font(.title2)
-
-                Image(systemName: "car.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(.blue)
-            }
-            .padding()
-            .onAppear {
-                print("Main view appeared - app is working")
-            }
+            ContentView()
+                .environment(appState)
+                .onAppear {
+                    print("ContentView appeared")
+                }
         }
     }
 }
