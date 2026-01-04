@@ -24,6 +24,8 @@
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>We need your location to find nearby points of interest and create personalized audio tours for your road trip.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app does not use the microphone. Audio playback for tour narration does not require microphone access.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
