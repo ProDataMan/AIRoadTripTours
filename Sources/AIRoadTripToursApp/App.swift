@@ -46,8 +46,8 @@ struct LoadingView: View {
                     print("AppState created, assigning...")
                     self.appState = state
 
-                    // Wait 2 seconds then dismiss launch screen
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    // Wait 5 seconds then dismiss launch screen (let video finish)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
                         print("Dismissing launch screen")
                         withAnimation(.easeOut(duration: 0.8)) {
                             showLaunchScreen = false

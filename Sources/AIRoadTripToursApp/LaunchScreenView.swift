@@ -55,7 +55,6 @@ public struct LaunchScreenView: View {
         print("Launch video found at: \(videoURL)")
 
         let player = AVPlayer(url: videoURL)
-        player.isMuted = true
         player.actionAtItemEnd = .pause  // Hold on last frame
 
         self.player = player
