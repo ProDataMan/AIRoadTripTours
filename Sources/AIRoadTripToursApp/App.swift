@@ -33,8 +33,14 @@ public struct AIRoadTripApp: App {
                     ContentView()
                         .environment(appState)
                         .onAppear {
-                            setupCarPlay()
-                            print("ContentView appeared")
+                            print("ContentView appeared - about to setup CarPlay")
+                            // Defer CarPlay setup to avoid blocking main thread
+                            Task.detached {
+                                await MainActor.run {
+                                    setupCarPlay()
+                                    print("CarPlay setup completed")
+                                }
+                            }
                         }
                 } else {
                     // Show loading placeholder while app initializes
@@ -66,16 +72,17 @@ public struct AIRoadTripApp: App {
         print("App initialization started...")
         let startTime = Date()
 
-        // Mark app as ready immediately - no artificial delays
+        // Mark app as ready immediately
         await MainActor.run {
             isAppReady = true
+            print("App marked as ready")
         }
 
         print("App initialization completed in \(Date().timeIntervalSince(startTime)) seconds")
 
-        // Keep launch screen visible for 5 seconds from start
+        // Keep launch screen visible for 2 seconds
         let elapsedTime = Date().timeIntervalSince(startTime)
-        let remainingTime = max(0, 5.0 - elapsedTime)
+        let remainingTime = max(0, 2.0 - elapsedTime)
 
         if remainingTime > 0 {
             print("Waiting \(remainingTime) more seconds for minimum launch screen duration...")
@@ -85,9 +92,10 @@ public struct AIRoadTripApp: App {
         // Dismiss launch screen with animation
         await MainActor.run {
             print("Dismissing launch screen")
-            withAnimation(.easeOut(duration: 0.8)) {
+            withAnimation(.easeOut(duration: 0.5)) {
                 showLaunchScreen = false
             }
+            print("Launch screen dismissed, ContentView should be visible")
         }
     }
 

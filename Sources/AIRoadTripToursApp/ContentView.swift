@@ -3,13 +3,20 @@ import SwiftUI
 public struct ContentView: View {
     @Environment(AppState.self) private var appState
 
-    public init() {}
+    public init() {
+        print("ContentView: Initializing")
+    }
 
     public var body: some View {
-        if appState.hasCompletedOnboarding {
-            MainTabView()
-        } else {
-            OnboardingView()
+        Group {
+            if appState.hasCompletedOnboarding {
+                MainTabView()
+            } else {
+                OnboardingView()
+            }
+        }
+        .onAppear {
+            print("ContentView: Body appeared, hasCompletedOnboarding = \(appState.hasCompletedOnboarding)")
         }
     }
 }
