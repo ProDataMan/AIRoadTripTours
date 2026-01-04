@@ -45,17 +45,11 @@ public struct LaunchScreenView: View {
 
             let player = AVPlayer(url: videoURL)
             player.isMuted = true
-            player.play()
 
-            // Loop the video
-            NotificationCenter.default.addObserver(
-                forName: .AVPlayerItemDidPlayToEndTime,
-                object: player.currentItem,
-                queue: .main
-            ) { _ in
-                player.seek(to: .zero)
-                player.play()
-            }
+            // Set actionAtItemEnd to pause so video holds on final frame
+            player.actionAtItemEnd = .pause
+
+            player.play()
 
             self.player = player
         } else {
