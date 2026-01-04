@@ -3,21 +3,26 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 63;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
+		12EEA451FC8D4442AC4338F3 /* LaunchVideo.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 4759113A351E423FA81AE2FB /* LaunchVideo.mp4 */; };
 		6725AF1D007782CC40CF79E5 /* AIRoadTripToursApp in Frameworks */ = {isa = PBXBuildFile; productRef = 75525C2C01EFE368734231FA /* AIRoadTripToursApp */; };
 		F179499F66CDC18347120F90 /* AIRoadTripToursIOSAppApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE3C5D7F0E96683915AFD187 /* AIRoadTripToursIOSAppApp.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		11B891B6310B6D295651FF5A /* AIRoadTripToursIOSApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AIRoadTripToursIOSApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4759113A351E423FA81AE2FB /* LaunchVideo.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = LaunchVideo.mp4; sourceTree = "<group>"; };
 		7054F85A0924BB6334922B13 /* AIRoadTripTours */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AIRoadTripTours; path = .; sourceTree = SOURCE_ROOT; };
 		99ADB7102F0AE77200390573 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		99ADB7152F0AEE6400390573 /* LaunchVideo.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = LaunchVideo.mp4; sourceTree = "<group>"; };
 		EE3C5D7F0E96683915AFD187 /* AIRoadTripToursIOSAppApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIRoadTripToursIOSAppApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		99ADB7172F0AF0DD00390573 /* Resources */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Resources; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		95A7FD98A59EB733D0597DD9 /* Frameworks */ = {
@@ -42,17 +47,18 @@
 		3DBFC8870D6D10B2AC72701D = {
 			isa = PBXGroup;
 			children = (
+				99ADB7172F0AF0DD00390573 /* Resources */,
 				99ADB7102F0AE77200390573 /* Assets.xcassets */,
 				49C548138A2B0BCBE9C418AC /* AIRoadTripToursIOSApp */,
 				026B2D686C2468ABAB7DB6B9 /* Packages */,
 				93B0FC65D26B03813A608C25 /* Products */,
-				99ADB7152F0AEE6400390573 /* LaunchVideo.mp4 */,
 			);
 			sourceTree = "<group>";
 		};
 		49C548138A2B0BCBE9C418AC /* AIRoadTripToursIOSApp */ = {
 			isa = PBXGroup;
 			children = (
+				4759113A351E423FA81AE2FB /* LaunchVideo.mp4 */,
 				EE3C5D7F0E96683915AFD187 /* AIRoadTripToursIOSAppApp.swift */,
 			);
 			path = AIRoadTripToursIOSApp;
@@ -75,10 +81,14 @@
 			buildPhases = (
 				B6DABD59B5DD73D6B5FA8710 /* Sources */,
 				95A7FD98A59EB733D0597DD9 /* Frameworks */,
+				99ADB7192F0AF2F100390573 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				99ADB7172F0AF0DD00390573 /* Resources */,
 			);
 			name = AIRoadTripToursIOSApp;
 			packageProductDependencies = (
@@ -118,6 +128,17 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		99ADB7192F0AF2F100390573 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				12EEA451FC8D4442AC4338F3 /* LaunchVideo.mp4 in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		B6DABD59B5DD73D6B5FA8710 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -134,6 +155,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphonesimulator*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
@@ -278,6 +300,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphonesimulator*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
