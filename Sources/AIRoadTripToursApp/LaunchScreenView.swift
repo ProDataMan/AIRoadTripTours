@@ -10,8 +10,8 @@ public struct LaunchScreenView: View {
 
     public var body: some View {
         ZStack {
-            // Black background
-            Color.black
+            // Dark background to match video (visible in landscape letterboxing)
+            Color(red: 0.1, green: 0.1, blue: 0.1)
                 .ignoresSafeArea()
 
             // Video player
