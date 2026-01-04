@@ -232,12 +232,13 @@ public final class AudioTourManager {
 
             // Generate teaser (3-5 min ETA, brief overview) with timeout
             let generator = EnrichedContentGenerator()
+            let interests = userInterests
 
             let teaserNarration = try await withTimeout(seconds: 30.0) {
                 try await generator.generateNarration(
                     for: session.poi,
                     targetDurationSeconds: 30.0,
-                    userInterests: userInterests
+                    userInterests: interests
                 )
             }
 
@@ -303,12 +304,13 @@ public final class AudioTourManager {
 
             // Generate detailed narration (1-2 min ETA) with timeout
             let generator = EnrichedContentGenerator()
+            let interests = userInterests
 
             let detailedNarration = try await withTimeout(seconds: 45.0) {
                 try await generator.generateNarration(
                     for: session.poi,
                     targetDurationSeconds: 90.0,
-                    userInterests: userInterests
+                    userInterests: interests
                 )
             }
 
