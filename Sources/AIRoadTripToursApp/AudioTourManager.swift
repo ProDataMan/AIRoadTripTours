@@ -4,6 +4,29 @@ import AVFoundation
 import AIRoadTripToursCore
 import AIRoadTripToursServices
 
+/// Error thrown when an operation times out
+struct TimeoutError: Error {
+    let seconds: Double
+}
+
+/// Executes an async operation with a timeout
+func withTimeout<T>(seconds: Double, operation: @escaping () async throws -> T) async throws -> T {
+    try await withThrowingTaskGroup(of: T.self) { group in
+        group.addTask {
+            try await operation()
+        }
+
+        group.addTask {
+            try await Task.sleep(for: .seconds(seconds))
+            throw TimeoutError(seconds: seconds)
+        }
+
+        let result = try await group.next()!
+        group.cancelAll()
+        return result
+    }
+}
+
 /// Manages audio tour playback state across the app.
 @available(iOS 17.0, macOS 14.0, *)
 @Observable
@@ -207,13 +230,16 @@ public final class AudioTourManager {
         do {
             playbackState = .playing
 
-            // Generate teaser (3-5 min ETA, brief overview)
+            // Generate teaser (3-5 min ETA, brief overview) with timeout
             let generator = EnrichedContentGenerator()
-            let teaserNarration = try await generator.generateNarration(
-                for: session.poi,
-                targetDurationSeconds: 30.0,
-                userInterests: userInterests
-            )
+
+            let teaserNarration = try await withTimeout(seconds: 30.0) {
+                try await generator.generateNarration(
+                    for: session.poi,
+                    targetDurationSeconds: 30.0,
+                    userInterests: userInterests
+                )
+            }
 
             currentNarration = teaserNarration
             sessions[currentSessionIndex].teaserPlayed = true
@@ -223,6 +249,11 @@ public final class AudioTourManager {
             // After teaser, ask if user wants to hear more
             await askForContinuation()
 
+        } catch is TimeoutError {
+            print("Timeout generating teaser for \(session.poi.name), skipping...")
+            playbackState = .idle
+            sessions[currentSessionIndex].currentPhase = .passed
+            currentSessionIndex += 1
         } catch {
             print("Error playing teaser: \(error)")
             playbackState = .failed
@@ -270,19 +301,27 @@ public final class AudioTourManager {
         do {
             playbackState = .playing
 
-            // Generate detailed narration (1-2 min ETA)
+            // Generate detailed narration (1-2 min ETA) with timeout
             let generator = EnrichedContentGenerator()
-            let detailedNarration = try await generator.generateNarration(
-                for: session.poi,
-                targetDurationSeconds: 90.0,
-                userInterests: userInterests
-            )
+
+            let detailedNarration = try await withTimeout(seconds: 45.0) {
+                try await generator.generateNarration(
+                    for: session.poi,
+                    targetDurationSeconds: 90.0,
+                    userInterests: userInterests
+                )
+            }
 
             currentNarration = detailedNarration
             sessions[currentSessionIndex].detailedPlayed = true
 
             try await audioService.play(detailedNarration)
 
+        } catch is TimeoutError {
+            print("Timeout generating detailed narration for \(session.poi.name), skipping...")
+            playbackState = .idle
+            sessions[currentSessionIndex].currentPhase = .passed
+            currentSessionIndex += 1
         } catch {
             print("Error playing detailed narration: \(error)")
             playbackState = .failed

@@ -72,8 +72,19 @@ public struct AudioTourView: View {
                 }
 
                 if tourManager.isGenerating {
-                    ProgressView("Preparing tour...")
-                        .padding()
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+
+                        Text("Preparing tour...")
+                            .font(.headline)
+
+                        Text("Loading POI information and optimizing route")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding()
                 } else {
                     // Playback Controls
                     VStack(spacing: 16) {
@@ -358,39 +369,45 @@ public struct AudioTourView: View {
             return
         }
 
-        do {
-            // Use selected POIs if any, otherwise find nearby POIs
-            let pois: [POI]
-            if !appState.selectedPOIs.isEmpty {
-                // Use selected POIs and optimize route
-                let optimizer = RouteOptimizer()
-                pois = await optimizer.optimizeRoute(
-                    startingFrom: userLocation,
-                    visiting: Array(appState.selectedPOIs)
-                )
-            } else {
-                // Find all nearby POIs and optimize route
-                let nearbyPOIs = try await appState.poiRepository.findNearby(
-                    location: userLocation,
-                    radiusMiles: 25.0,
-                    categories: nil
+        // Start generating immediately with loading state
+        tourManager.isGenerating = true
+
+        Task {
+            do {
+                // Use selected POIs if any, otherwise find nearby POIs
+                let pois: [POI]
+                if !appState.selectedPOIs.isEmpty {
+                    // Use selected POIs and optimize route
+                    let optimizer = RouteOptimizer()
+                    pois = await optimizer.optimizeRoute(
+                        startingFrom: userLocation,
+                        visiting: Array(appState.selectedPOIs)
+                    )
+                } else {
+                    // Find all nearby POIs and optimize route
+                    let nearbyPOIs = try await appState.poiRepository.findNearby(
+                        location: userLocation,
+                        radiusMiles: 25.0,
+                        categories: nil
+                    )
+
+                    let optimizer = RouteOptimizer()
+                    pois = await optimizer.optimizeRoute(
+                        startingFrom: userLocation,
+                        visiting: Array(nearbyPOIs.prefix(5))
+                    )
+                }
+
+                // Start tour with manager
+                await tourManager.startTour(
+                    pois: pois,
+                    userInterests: appState.currentUser?.interests ?? []
                 )
 
-                let optimizer = RouteOptimizer()
-                pois = await optimizer.optimizeRoute(
-                    startingFrom: userLocation,
-                    visiting: Array(nearbyPOIs.prefix(5))
-                )
+            } catch {
+                print("Error starting audio tour: \(error)")
+                tourManager.isGenerating = false
             }
-
-            // Start tour with manager
-            await tourManager.startTour(
-                pois: pois,
-                userInterests: appState.currentUser?.interests ?? []
-            )
-
-        } catch {
-            print("Error starting audio tour: \(error)")
         }
     }
 
