@@ -263,7 +263,7 @@ public struct TourMapView: View {
         withAnimation(.easeInOut(duration: 1.5)) {
             region = MKCoordinateRegion(
                 center: poi.location.coordinate,
-                span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02) // Closer zoom for introduction
+                span: MKCoordinateSpan(latitudeDelta: 0.003, longitudeDelta: 0.003) // Very tight street-level zoom
             )
         }
         print("🗺️ Region updated to: center=(\(region.center.latitude), \(region.center.longitude)), span=(\(region.span.latitudeDelta), \(region.span.longitudeDelta))")
