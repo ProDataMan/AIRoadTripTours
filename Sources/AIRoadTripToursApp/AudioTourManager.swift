@@ -27,7 +27,7 @@ func withTimeout<T: Sendable>(seconds: Double, operation: @escaping @Sendable ()
     }
 }
 
-/// Manages audio tour playback state across the app.
+    /// Manages audio tour playback state across the app.
 @available(iOS 17.0, macOS 14.0, *)
 @Observable
 @MainActor
@@ -45,11 +45,33 @@ public final class AudioTourManager {
     public var isGenerating = false
     public var isPrepared = false
     public var isMonitoring = false
+    public var poisReadyForMap = false  // New flag to signal POIs are loaded
 
-    public var currentPOIs: [POI] = []
+    public var currentPOIs: [POI] = [] {
+        didSet {
+            print("🗺️ AudioTourManager: currentPOIs changed from \(oldValue.count) to \(currentPOIs.count) POIs")
+        }
+    }
     public var currentPOIImages: [UUID: [POIImage]] = [:] // POI.id -> images
-    public var sessions: [NarrationSession] = []
+    public var sessions: [NarrationSession] = [] {
+        didSet {
+            print("🗺️ AudioTourManager: sessions changed from \(oldValue.count) to \(sessions.count) sessions")
+        }
+    }
     public var currentSessionIndex = 0
+
+    // For coordinating map zoom during introduction
+    public var introducingPOIIndex: Int? = nil {
+        didSet {
+            print("🗺️ AudioTourManager: introducingPOIIndex changed from \(String(describing: oldValue)) to \(String(describing: introducingPOIIndex))")
+            // Post notification to communicate across sheet boundary
+            NotificationCenter.default.post(
+                name: NSNotification.Name("IntroducingPOIIndexChanged"),
+                object: nil,
+                userInfo: ["index": introducingPOIIndex as Any]
+            )
+        }
+    }
 
     private var monitoringTask: Task<Void, Never>?
     private var userInterests: Set<UserInterest> = []
@@ -66,35 +88,51 @@ public final class AudioTourManager {
 
     // MARK: - Tour Control
 
-    /// Prepares the tour by loading content but doesn't start playback.
-    /// Playback will start automatically when first POI is nearby.
-    public func startTour(pois: [POI], userInterests: Set<UserInterest>) async {
+    /// Prepares the tour by loading POIs and sessions, but doesn't start narration.
+    /// Returns the prepared POIs and sessions immediately.
+    /// Call playWelcomeIntroduction() separately to start narration.
+    public func prepareTour(pois: [POI], userInterests: Set<UserInterest>) async -> (pois: [POI], sessions: [NarrationSession]) {
         // Stop any existing tour
         await stopTour()
 
         isGenerating = true
         currentPOIs = pois
         self.userInterests = userInterests
-        defer { isGenerating = false }
 
         // Initialize tour tracking
         tourStartTime = Date()
         tourName = pois.count == 1 ? pois[0].name : "\(pois.count) POI Tour"
         routeCoordinates = []
 
-        // Load images for all POIs in parallel
-        await loadImagesForPOIs(pois)
-
-        // Create sessions for each POI
+        // Create sessions immediately (before async image loading)
         sessions = pois.map { poi in
             NarrationSession(poi: poi)
         }
 
+        // POIs and sessions are now ready for map display
+        poisReadyForMap = true
+        print("🗺️ ✅ POIs and sessions ready for map display")
+
+        // Load images for all POIs in parallel (async, can happen in background)
+        await loadImagesForPOIs(pois)
+
         currentSessionIndex = 0
         isPrepared = true
         playbackState = .preparing
+        isGenerating = false
 
-        print("✅ Tour prepared with \(pois.count) POIs. Waiting for proximity to first POI...")
+        print("✅ Tour prepared with \(pois.count) POIs")
+
+        // Return the data directly instead of relying on property reads
+        return (currentPOIs, sessions)
+    }
+
+    /// Prepares the tour and plays welcome introduction (convenience method).
+    /// Playback will start automatically when first POI is nearby.
+    public func startTour(pois: [POI], userInterests: Set<UserInterest>) async {
+        let (preparedPOIs, preparedSessions) = await prepareTour(pois: pois, userInterests: userInterests)
+        print("🔊 Playing welcome introduction...")
+        await playWelcomeIntroduction(poiCount: preparedPOIs.count, sessionsToIntroduce: preparedSessions)
     }
 
     /// Starts monitoring user location and triggers narrations based on proximity.
@@ -135,6 +173,7 @@ public final class AudioTourManager {
         currentSessionIndex = 0
         isPrepared = false
         isMonitoring = false
+        poisReadyForMap = false
 
         // Clear tour tracking
         tourStartTime = nil
@@ -297,6 +336,234 @@ public final class AudioTourManager {
         #endif
     }
 
+    /// Plays the welcome message and introduces each POI with map zoom coordination.
+    /// Should be called after prepareTour() completes.
+    /// - Parameters:
+    ///   - poiCount: Number of POIs in the tour (passed to avoid timing issues)
+    ///   - sessionsToIntroduce: Sessions to introduce (passed to avoid @Observable timing issues)
+    public func playWelcomeIntroduction(poiCount: Int? = nil, sessionsToIntroduce: [NarrationSession]? = nil) async {
+        #if canImport(UIKit)
+        do {
+            playbackState = .playing
+
+            // Generate welcome message content
+            let welcomeContent = generateWelcomeContent()
+
+            // Create welcome narration
+            let welcomeNarration = Narration(
+                id: UUID(),
+                poiId: UUID(), // Not tied to specific POI
+                poiName: "Tour Introduction",
+                title: "Welcome to AI Road Trip Tours",
+                content: welcomeContent,
+                durationSeconds: Double(welcomeContent.count) / 15.0, // ~15 chars per second speech rate
+                source: "System"
+            )
+
+            currentNarration = welcomeNarration
+
+            try await audioService.play(welcomeNarration)
+
+            // Now introduce each POI individually with map zoom coordination
+            let count = poiCount ?? sessions.count
+            let overview = "Today's tour includes \(count) fascinating destination\(count == 1 ? "" : "s"). Let me show you each one."
+
+            let overviewIntro = Narration(
+                id: UUID(),
+                poiId: UUID(),
+                poiName: "Tour Overview",
+                title: "Today's Tour Overview",
+                content: overview,
+                durationSeconds: Double(overview.count) / 15.0,
+                source: "System"
+            )
+
+            currentNarration = overviewIntro
+            try await audioService.play(overviewIntro)
+
+            // Introduce each POI with coordinated map zoom
+            let sessionsToLoop = sessionsToIntroduce ?? sessions
+            print("🗺️ About to introduce \(sessionsToLoop.count) POIs individually")
+            for (index, session) in sessionsToLoop.enumerated() {
+                await introducePOI(session: session, index: index)
+            }
+
+            // Zoom back out to full view
+            introducingPOIIndex = nil
+            print("🗺️ Zooming out to full tour view")
+            try? await Task.sleep(for: .seconds(2))
+
+            // Closing message
+            let closingContent = "That's your tour preview! Now, let's begin. The detailed narration will start automatically as you approach each destination. Safe travels!"
+
+            let closingNarration = Narration(
+                id: UUID(),
+                poiId: UUID(),
+                poiName: "Tour Start",
+                title: "Let's Begin",
+                content: closingContent,
+                durationSeconds: Double(closingContent.count) / 15.0,
+                source: "System"
+            )
+
+            currentNarration = closingNarration
+            try await audioService.play(closingNarration)
+
+            // Set playback to idle, waiting for vehicle to start moving
+            playbackState = .idle
+            currentNarration = nil
+
+            print("✅ Welcome introduction completed. Waiting for proximity to first POI...")
+
+        } catch {
+            print("Error playing welcome introduction: \(error)")
+            playbackState = .idle
+        }
+        #endif
+    }
+
+    private func introducePOI(session: NarrationSession, index: Int) async {
+        #if canImport(UIKit)
+        do {
+            let poi = session.poi
+
+            // Start zooming to this POI
+            introducingPOIIndex = index
+            print("🎯 Zooming to POI \(index): \(poi.name)")
+
+            // Wait for zoom animation to complete
+            try await Task.sleep(for: .seconds(1.5))
+
+            // Create introduction narration for this POI
+            var poiIntro = "Stop number \(index + 1): \(poi.name). "
+            poiIntro += "\(poi.category.rawValue). "
+
+            if let description = poi.description, !description.isEmpty {
+                let briefDesc = String(description.prefix(150))
+                poiIntro += "\(briefDesc). "
+            }
+
+            let poiNarration = Narration(
+                id: UUID(),
+                poiId: poi.id,
+                poiName: poi.name,
+                title: "POI Introduction",
+                content: poiIntro,
+                durationSeconds: Double(poiIntro.count) / 15.0,
+                source: "System"
+            )
+
+            currentNarration = poiNarration
+            try await audioService.play(poiNarration)
+
+            // Zoom back out to full view
+            introducingPOIIndex = nil
+            print("🗺️ Zooming back out to full tour view")
+
+            // Pause before next POI
+            try await Task.sleep(for: .seconds(1.5))
+
+        } catch {
+            print("Error introducing POI \(session.poi.name): \(error)")
+        }
+        #endif
+    }
+
+    private func generateWelcomeContent() -> String {
+        return """
+        Welcome to AI Road Trip Tours! Thank you for choosing us for your journey today. \
+
+        We're excited to be your guide on this adventure. Our app uses artificial intelligence to provide you with \
+        personalized narration about the fascinating places along your route. \
+
+        As you drive, we'll automatically detect when you're approaching points of interest and share engaging stories, \
+        historical facts, and local insights tailored to your interests. \
+
+        The tour narration will begin automatically when your vehicle starts moving and you get close to our first destination. \
+        You can pause, skip, or ask for more details at any time using voice commands or the controls on your screen. \
+
+        Now, let me give you a preview of the amazing places we'll be exploring today.
+        """
+    }
+
+    private func generateTourOverview() -> String {
+        guard !sessions.isEmpty else {
+            return "Your tour is ready. Start driving to begin exploring!"
+        }
+
+        var overview = "Today's tour includes \(sessions.count) fascinating destination\(sessions.count == 1 ? "" : "s"). "
+
+        // List each POI with brief summary
+        for (index, session) in sessions.enumerated() {
+            let poi = session.poi
+            let number = index + 1
+
+            overview += "Stop number \(number): \(poi.name). "
+
+            // Add category context
+            overview += "\(poi.category.rawValue). "
+
+            // Add brief description if available
+            if let description = poi.description, !description.isEmpty {
+                let briefDesc = String(description.prefix(150))
+                overview += "\(briefDesc). "
+            }
+        }
+
+        // Add navigation timing estimates
+        overview += "\n\nHere's what to expect for travel times: "
+
+        for (index, session) in sessions.enumerated() {
+            let number = index + 1
+
+            // Estimate times (in real implementation, use actual navigation data)
+            let travelTime = estimateTravelTime(to: session, fromPreviousIndex: index - 1)
+            let tourDuration = estimateTourDuration(for: session)
+
+            if index == 0 {
+                let minutes = Int(travelTime / 60)
+                overview += "We'll arrive at our first stop, \(session.poi.name), in approximately \(minutes) minute\(minutes == 1 ? "" : "s"). "
+                overview += "The tour of that area will take about \(Int(tourDuration / 60)) minutes. "
+            } else if index < sessions.count - 1 {
+                let minutes = Int(travelTime / 60)
+                let nextMinutes = Int(estimateTravelTime(to: sessions[index + 1], fromPreviousIndex: index) / 60)
+                overview += "Then, after \(minutes) minute\(minutes == 1 ? "" : "s") of driving, we'll reach \(session.poi.name) for about \(Int(tourDuration / 60)) minutes. "
+            } else {
+                // Last stop
+                let minutes = Int(travelTime / 60)
+                overview += "Finally, we'll arrive at our last destination, \(session.poi.name), after \(minutes) more minute\(minutes == 1 ? "" : "s") of travel. "
+            }
+        }
+
+        overview += "\n\nSit back, relax, and enjoy the journey. The narration will begin automatically as you approach each destination. Safe travels!"
+
+        return overview
+    }
+
+    private func estimateTravelTime(to session: NarrationSession, fromPreviousIndex previousIndex: Int) -> TimeInterval {
+        // Estimate travel time based on distance
+        // Assume average speed of 45 mph on road trips
+        let averageSpeedMPH = 45.0
+        let distance = session.distanceToPOI
+
+        // If this is not the first POI, estimate from previous POI
+        if previousIndex >= 0 && previousIndex < sessions.count {
+            let previousPOI = sessions[previousIndex].poi
+            let distanceBetween = session.poi.location.distance(to: previousPOI.location)
+            let timeInHours = distanceBetween / averageSpeedMPH
+            return timeInHours * 3600 // Convert to seconds
+        }
+
+        // First POI - use current distance
+        let timeInHours = distance / averageSpeedMPH
+        return max(timeInHours * 3600, 300) // Minimum 5 minutes
+    }
+
+    private func estimateTourDuration(for session: NarrationSession) -> TimeInterval {
+        // Estimate 10-15 minutes per POI tour
+        return 12 * 60 // 12 minutes average
+    }
+
     private func playDetailedNarration(for session: NarrationSession) async {
         #if canImport(UIKit)
         do {
@@ -402,14 +669,17 @@ public final class AudioTourManager {
     // MARK: - Images
 
     public func getImagesForCurrentPOI() -> [POIImage] {
-        guard let current = currentNarration else { return [] }
+        guard let current = currentNarration else {
+            return []
+        }
 
         // Find the POI that matches the current narration
         guard let poi = currentPOIs.first(where: { $0.id == current.poiId }) else {
             return []
         }
 
-        return currentPOIImages[poi.id] ?? []
+        let images = currentPOIImages[poi.id] ?? []
+        return images
     }
 
     private func loadImagesForPOIs(_ pois: [POI]) async {

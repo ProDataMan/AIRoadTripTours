@@ -1,7 +1,7 @@
 import Foundation
 import AIRoadTripToursCore
 
-/// Service for fetching images for Points of Interest from Wikipedia Commons.
+/// Service for fetching images for Points of Interest from Wikipedia Commons and Google Maps.
 @available(iOS 17.0, macOS 14.0, *)
 public actor POIImageService {
 
@@ -14,7 +14,7 @@ public actor POIImageService {
         self.imageCache.countLimit = 100
     }
 
-    /// Fetches images for a POI from Wikipedia Commons.
+    /// Fetches images for a POI from Wikipedia Commons, falling back to Google Places if needed.
     /// - Parameters:
     ///   - poi: The point of interest to fetch images for
     ///   - limit: Maximum number of images to fetch (default: 10)
@@ -26,6 +26,26 @@ public actor POIImageService {
             return cached
         }
 
+        // Try Wikipedia Commons first
+        var images = try await fetchFromWikipedia(poi: poi, limit: limit)
+
+        // If Wikipedia returns no images, try Google Places
+        if images.isEmpty {
+            print("📷 No Wikipedia images found for \(poi.name), trying Google Places...")
+            images = try await fetchFromGooglePlaces(poi: poi, limit: limit)
+        }
+
+        // Cache results
+        if !images.isEmpty {
+            imageCache.setObject(images as NSArray, forKey: cacheKey)
+        }
+
+        return images
+    }
+
+    // MARK: - Wikipedia Commons
+
+    private func fetchFromWikipedia(poi: POI, limit: Int) async throws -> [POIImage] {
         // Build search query from POI name
         let searchTerm = poi.name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? poi.name
 
@@ -56,15 +76,8 @@ public actor POIImageService {
             throw ImageServiceError.httpError(statusCode: httpResponse.statusCode)
         }
 
-        let images = try parseWikimediaResponse(data)
-
-        // Cache results
-        imageCache.setObject(images as NSArray, forKey: cacheKey)
-
-        return images
+        return try parseWikimediaResponse(data)
     }
-
-    // MARK: - Private
 
     private nonisolated func parseWikimediaResponse(_ data: Data) throws -> [POIImage] {
         guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -109,6 +122,137 @@ public actor POIImageService {
 
         return images
     }
+
+    // MARK: - Google Places
+
+    private func fetchFromGooglePlaces(poi: POI, limit: Int) async throws -> [POIImage] {
+        // First, search for the place to get the place ID
+        guard let placeId = try await searchGooglePlace(poi: poi) else {
+            print("📷 No Google Place found for \(poi.name)")
+            return []
+        }
+
+        // Then fetch photos for that place
+        return try await fetchGooglePlacePhotos(placeId: placeId, limit: limit)
+    }
+
+    private func searchGooglePlace(poi: POI) async throws -> String? {
+        // Skip if Google Places API is not configured
+        guard ServiceConfiguration.isGooglePlacesConfigured else {
+            print("⚠️ Google Places API key not configured, skipping Google image search")
+            return nil
+        }
+
+        // Build search query with name and location
+        let searchTerm = poi.name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? poi.name
+
+        let apiKey = ServiceConfiguration.googlePlacesAPIKey
+
+        let urlString = """
+        https://maps.googleapis.com/maps/api/place/textsearch/json?\
+        query=\(searchTerm)&\
+        location=\(poi.location.latitude),\(poi.location.longitude)&\
+        radius=1000&\
+        key=\(apiKey)
+        """
+
+        guard let url = URL(string: urlString) else {
+            throw ImageServiceError.invalidURL
+        }
+
+        let (data, response) = try await urlSession.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw ImageServiceError.invalidResponse
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw ImageServiceError.httpError(statusCode: httpResponse.statusCode)
+        }
+
+        // Parse response to get place_id
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let results = json["results"] as? [[String: Any]],
+              let firstResult = results.first,
+              let placeId = firstResult["place_id"] as? String else {
+            return nil
+        }
+
+        return placeId
+    }
+
+    private func fetchGooglePlacePhotos(placeId: String, limit: Int) async throws -> [POIImage] {
+        let apiKey = ServiceConfiguration.googlePlacesAPIKey
+
+        let urlString = """
+        https://maps.googleapis.com/maps/api/place/details/json?\
+        place_id=\(placeId)&\
+        fields=photos&\
+        key=\(apiKey)
+        """
+
+        guard let url = URL(string: urlString) else {
+            throw ImageServiceError.invalidURL
+        }
+
+        let (data, response) = try await urlSession.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw ImageServiceError.invalidResponse
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw ImageServiceError.httpError(statusCode: httpResponse.statusCode)
+        }
+
+        // Parse photos
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let result = json["result"] as? [String: Any],
+              let photos = result["photos"] as? [[String: Any]] else {
+            return []
+        }
+
+        var images: [POIImage] = []
+
+        for photo in photos.prefix(limit) {
+            guard let photoReference = photo["photo_reference"] as? String else {
+                continue
+            }
+
+            // Build photo URL
+            let photoURL = """
+            https://maps.googleapis.com/maps/api/place/photo?\
+            maxwidth=800&\
+            photo_reference=\(photoReference)&\
+            key=\(apiKey)
+            """
+
+            let thumbnailURL = """
+            https://maps.googleapis.com/maps/api/place/photo?\
+            maxwidth=400&\
+            photo_reference=\(photoReference)&\
+            key=\(apiKey)
+            """
+
+            // Extract attributions
+            let attributions = (photo["html_attributions"] as? [String])?.joined(separator: ", ")
+
+            let poiImage = POIImage(
+                url: photoURL,
+                thumbnailURL: thumbnailURL,
+                caption: nil,
+                attribution: attributions,
+                source: "google"
+            )
+
+            images.append(poiImage)
+        }
+
+        print("📷 Found \(images.count) Google Places images for place ID: \(placeId)")
+        return images
+    }
+
+    // MARK: - Helpers
 
     private nonisolated func extractMetadataValue(from metadata: [String: Any]?, key: String) -> String? {
         guard let metadata = metadata,

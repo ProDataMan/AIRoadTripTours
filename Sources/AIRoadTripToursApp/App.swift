@@ -4,7 +4,10 @@ import AIRoadTripToursServices
 
 /// Main iOS app structure.
 public struct AIRoadTripApp: App {
-    public init() {}
+    public init() {
+        // Load environment variables from .env file
+        ServiceConfiguration.loadEnvironment()
+    }
 
     public var body: some Scene {
         WindowGroup {
@@ -46,8 +49,8 @@ struct LoadingView: View {
                     print("AppState created, assigning...")
                     self.appState = state
 
-                    // Wait 5 seconds then dismiss launch screen (let video finish)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+                    // Wait 8.5 seconds then dismiss launch screen (6.3s video + 2s pause on last frame)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 8.5) {
                         print("Dismissing launch screen")
                         withAnimation(.easeOut(duration: 0.8)) {
                             showLaunchScreen = false

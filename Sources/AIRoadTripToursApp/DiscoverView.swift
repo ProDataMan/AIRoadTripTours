@@ -1,6 +1,7 @@
 import SwiftUI
 import AIRoadTripToursCore
 import AIRoadTripToursServices
+import CoreLocation
 
 #if canImport(UIKit)
 import UIKit
@@ -8,6 +9,7 @@ import UIKit
 
 public struct DiscoverView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.selectedTab) private var selectedTab
     @StateObject private var locationService = LocationService()
     @State private var searchLocation = ""
     @State private var pois: [POI] = []
@@ -16,14 +18,33 @@ public struct DiscoverView: View {
     @State private var selectedCategories: Set<POICategory> = []
     @State private var showCategoryFilter = false
     @State private var poiSearchText = ""
+    @State private var referenceLocation: GeoLocation?
+    @State private var searchedLocationName: String?
+    @State private var sortOrder: POISortOrder = .distance
 
     public init() {}
+
+    enum POISortOrder: String, CaseIterable {
+        case distance = "Distance"
+        case category = "Category"
+        case name = "Name"
+        case rating = "Rating"
+    }
 
     public var body: some View {
         NavigationStack {
             VStack(spacing: 20) {
                 // Location status
-                if locationService.currentLocation != nil {
+                if let searchedLocation = searchedLocationName {
+                    HStack {
+                        Image(systemName: "mappin.circle.fill")
+                            .foregroundStyle(.blue)
+                        Text("Searching near \(searchedLocation)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal)
+                } else if locationService.currentLocation != nil {
                     HStack {
                         Image(systemName: "location.fill")
                             .foregroundStyle(.green)
@@ -112,6 +133,23 @@ public struct DiscoverView: View {
                 }
                 .padding(.top)
 
+                // Sort order picker
+                if !pois.isEmpty {
+                    HStack {
+                        Label("Sort by", systemImage: "arrow.up.arrow.down")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+
+                        Picker("Sort by", selection: $sortOrder) {
+                            ForEach(POISortOrder.allCases, id: \.self) { order in
+                                Text(order.rawValue).tag(order)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                    .padding(.horizontal)
+                }
+
                 if isSearching {
                     ProgressView("Searching...")
                         .padding()
@@ -147,11 +185,20 @@ public struct DiscoverView: View {
                     }
                     .frame(maxHeight: .infinity)
                 } else {
-                    List(filteredPOIs) { poi in
+                    List(sortedAndFilteredPOIs) { poi in
                         NavigationLink(destination: POIDetailView(poi: poi)) {
                             HStack {
-                                POIRow(poi: poi)
-                                Spacer()
+                                POIRow(poi: poi, referenceLocation: referenceLocation)
+
+                                // Quick add/remove button
+                                Button {
+                                    toggleSelection(poi)
+                                } label: {
+                                    Image(systemName: appState.selectedPOIs.contains(poi) ? "checkmark.circle.fill" : "plus.circle")
+                                        .font(.title2)
+                                        .foregroundStyle(appState.selectedPOIs.contains(poi) ? .green : .blue)
+                                }
+                                .buttonStyle(.plain)
                             }
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -185,7 +232,9 @@ public struct DiscoverView: View {
                                         .cornerRadius(8)
                                 }
 
-                                NavigationLink(destination: AudioTourView()) {
+                                Button {
+                                    selectedTab.wrappedValue = 2 // Switch to Audio Tour tab
+                                } label: {
                                     Label("Start Tour", systemImage: "play.circle.fill")
                                         .padding()
                                         .background(.green)
@@ -222,6 +271,30 @@ public struct DiscoverView: View {
         }
     }
 
+    private var sortedAndFilteredPOIs: [POI] {
+        let filtered = filteredPOIs
+
+        switch sortOrder {
+        case .distance:
+            guard let refLocation = referenceLocation else { return filtered }
+            return filtered.sorted(by: { poi1, poi2 in
+                let dist1 = poi1.location.distance(to: refLocation)
+                let dist2 = poi2.location.distance(to: refLocation)
+                return dist1 < dist2
+            })
+        case .category:
+            return filtered.sorted(by: { $0.category.rawValue < $1.category.rawValue })
+        case .name:
+            return filtered.sorted(by: { $0.name < $1.name })
+        case .rating:
+            return filtered.sorted(by: { poi1, poi2 in
+                let rating1 = poi1.rating?.averageRating ?? 0
+                let rating2 = poi2.rating?.averageRating ?? 0
+                return rating1 > rating2 // Higher ratings first
+            })
+        }
+    }
+
     private var filteredPOIs: [POI] {
         if poiSearchText.isEmpty {
             return pois
@@ -239,28 +312,67 @@ public struct DiscoverView: View {
         defer { isSearching = false }
 
         do {
-            // Use actual user location if available, otherwise fallback
+            // Use actual user location if available, otherwise geocode search text
             let searchLocation: GeoLocation
-            if let userLocation = locationService.currentLocation {
+            if !self.searchLocation.isEmpty {
+                // Geocode the search location text
+                let geocodedLocation = await geocodeLocation(self.searchLocation)
+                if let location = geocodedLocation {
+                    searchLocation = location
+                    searchedLocationName = self.searchLocation.capitalized
+                    referenceLocation = location
+                } else {
+                    // Geocoding failed
+                    print("Failed to geocode location: \(self.searchLocation)")
+                    return
+                }
+            } else if let userLocation = locationService.currentLocation {
                 searchLocation = userLocation
-            } else if !self.searchLocation.isEmpty {
-                // TODO: Geocode the search location text
-                // For now, fallback to Portland
-                searchLocation = GeoLocation(latitude: 45.5152, longitude: -122.6784)
+                searchedLocationName = nil
+                referenceLocation = userLocation
             } else {
                 // No location available
                 showLocationPermissionAlert = true
                 return
             }
 
-            pois = try await appState.poiRepository.findNearby(
+            let foundPOIs = try await appState.poiRepository.findNearby(
                 location: searchLocation,
                 radiusMiles: 25.0,
                 categories: selectedCategories.isEmpty ? nil : selectedCategories
             )
+
+            // Enrich POIs with Google Places descriptions
+            print("📝 Enriching \(foundPOIs.count) POIs with Google Places data...")
+            if #available(iOS 17.0, macOS 14.0, *) {
+                let enrichmentService = POIEnrichmentService()
+                pois = await enrichmentService.enrichBatch(foundPOIs)
+                let enrichedCount = pois.filter { $0.description != nil && !$0.description!.isEmpty }.count
+                print("✅ Enriched \(enrichedCount) of \(pois.count) POIs with descriptions")
+            } else {
+                pois = foundPOIs
+            }
         } catch {
             print("Error searching POIs: \(error)")
         }
+    }
+
+    private func geocodeLocation(_ locationName: String) async -> GeoLocation? {
+        #if canImport(CoreLocation)
+        let geocoder = CLGeocoder()
+        do {
+            let placemarks = try await geocoder.geocodeAddressString(locationName)
+            if let location = placemarks.first?.location {
+                return GeoLocation(
+                    latitude: location.coordinate.latitude,
+                    longitude: location.coordinate.longitude
+                )
+            }
+        } catch {
+            print("Geocoding error: \(error)")
+        }
+        #endif
+        return nil
     }
 
     private func toggleSelection(_ poi: POI) {
@@ -273,49 +385,92 @@ public struct DiscoverView: View {
 }
 
 struct POIRow: View {
+    @Environment(AppState.self) private var appState
     let poi: POI
+    let referenceLocation: GeoLocation?
     @State private var thumbnailImage: POIImage?
     @State private var isLoadingImage = false
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Thumbnail image
-            Group {
-                if let image = thumbnailImage {
-                    AsyncImage(url: URL(string: image.thumbnailURL ?? image.url)) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        case .failure, .empty:
-                            Image(systemName: "photo")
-                                .foregroundStyle(.gray)
-                        @unknown default:
-                            EmptyView()
+        HStack(alignment: .top, spacing: 12) {
+            // Thumbnail image with checkmark overlay
+            ZStack(alignment: .topLeading) {
+                Group {
+                    if let image = thumbnailImage {
+                        AsyncImage(url: URL(string: image.thumbnailURL ?? image.url)) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            case .failure, .empty:
+                                Image(systemName: "photo")
+                                    .foregroundStyle(.gray)
+                            @unknown default:
+                                EmptyView()
+                            }
                         }
+                    } else if isLoadingImage {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "photo")
+                            .foregroundStyle(.gray)
                     }
-                } else if isLoadingImage {
-                    ProgressView()
-                } else {
-                    Image(systemName: "photo")
-                        .foregroundStyle(.gray)
+                }
+                .frame(width: 80, height: 80)
+                .background(Color.gray.opacity(0.1))
+                .cornerRadius(8)
+                .clipped()
+
+                // Green checkmark indicator if POI is added to tour
+                if appState.selectedPOIs.contains(poi) {
+                    ZStack {
+                        Circle()
+                            .fill(.green)
+                            .frame(width: 24, height: 24)
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                    .offset(x: 4, y: 4)
+                    .shadow(radius: 2)
                 }
             }
-            .frame(width: 60, height: 60)
-            .background(Color.gray.opacity(0.1))
-            .cornerRadius(8)
-            .clipped()
+            .frame(width: 80, height: 80)
 
             // POI info
-            VStack(alignment: .leading, spacing: 8) {
-                Text(poi.name)
-                    .font(.headline)
+            VStack(alignment: .leading, spacing: 6) {
+                // Name with open status indicator
+                HStack(spacing: 6) {
+                    Text(poi.name)
+                        .font(.headline)
+                        .lineLimit(2)
 
+                    if let hours = poi.hours, let isOpen = hours.isOpenNow {
+                        Circle()
+                            .fill(isOpen ? .green : .red)
+                            .frame(width: 6, height: 6)
+                        Text(isOpen ? "Open" : "Closed")
+                            .font(.caption2)
+                            .foregroundStyle(isOpen ? .green : .red)
+                    }
+                }
+
+                // Category, distance, rating row
                 HStack {
                     Label(poi.category.rawValue, systemImage: "tag")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+
+                    if let refLocation = referenceLocation {
+                        let distance = poi.location.distance(to: refLocation)
+                        Text("•")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Label(String(format: "%.1f mi", distance), systemImage: "location.fill")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
 
                     Spacer()
 
@@ -326,12 +481,66 @@ struct POIRow: View {
                                 .foregroundStyle(.yellow)
                             Text(String(format: "%.1f", rating.averageRating))
                                 .font(.caption)
+                            Text("(\(rating.totalRatings))")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
                         }
+                    }
+                }
+
+                // Price level indicator
+                if let rating = poi.rating, let priceLevel = rating.priceLevel {
+                    Text(String(repeating: "$", count: priceLevel))
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                        .fontWeight(.semibold)
+                }
+
+                // Brief description
+                if let description = poi.description, !description.isEmpty {
+                    Text(description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+
+                // Contact info row
+                HStack(spacing: 10) {
+                    if let phone = poi.contact?.phone {
+                        HStack(spacing: 2) {
+                            Image(systemName: "phone.fill")
+                                .font(.caption2)
+                            Text(formatPhone(phone))
+                                .font(.caption2)
+                        }
+                        .foregroundStyle(.blue)
+                    }
+
+                    if poi.contact?.website != nil {
+                        HStack(spacing: 2) {
+                            Image(systemName: "globe")
+                                .font(.caption2)
+                            Text("Website")
+                                .font(.caption2)
+                        }
+                        .foregroundStyle(.blue)
+                    }
+                }
+
+                // Hours summary
+                if let hours = poi.hours {
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock")
+                            .font(.caption2)
+                        Text(formatHoursSummary(hours.description))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
                 }
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
         .task {
             await loadThumbnail()
         }
@@ -348,6 +557,26 @@ struct POIRow: View {
         } catch {
             // Silently fail - will show placeholder
         }
+    }
+
+    private func formatPhone(_ phone: String) -> String {
+        // Extract just the digits for a cleaner display
+        let digits = phone.filter { $0.isNumber }
+        if digits.count == 10 {
+            let area = digits.prefix(3)
+            let prefix = digits.dropFirst(3).prefix(3)
+            let line = digits.suffix(4)
+            return "(\(area)) \(prefix)-\(line)"
+        }
+        return phone
+    }
+
+    private func formatHoursSummary(_ hours: String) -> String {
+        // Get first part before comma for brevity
+        if let firstPart = hours.components(separatedBy: ",").first {
+            return firstPart
+        }
+        return hours
     }
 }
 

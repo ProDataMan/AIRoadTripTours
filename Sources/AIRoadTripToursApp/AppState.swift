@@ -26,9 +26,21 @@ public final class AppState {
 
     public let rangeEstimator: RangeEstimator
     private let storage: OnboardingStorage
+    public let tourStorage = TourStorage()
     public let favoritesStorage = FavoritePOIsStorage()
     public let tourHistoryStorage = TourHistoryStorage()
     public let communityTourRepository = CommunityTourRepository()
+
+    // Offline support services
+    public let audioCache: AudioCacheStorage
+    public let offlinePackageStorage: OfflineTourPackageStorage
+    public let networkMonitor: NetworkConnectivityMonitor
+    public let offlineDownloadManager: OfflineTourDownloadManager
+
+    /// Saved tours for offline downloads
+    public var savedTours: [Tour] {
+        tourStorage.loadTours()
+    }
 
     /// Shared audio tour manager that persists across navigation
     @available(iOS 17.0, macOS 14.0, *)
@@ -43,6 +55,22 @@ public final class AppState {
         // Initialize storage - fast
         self.storage = OnboardingStorage()
         self.rangeEstimator = SimpleRangeEstimator()
+
+        // Initialize offline support services
+        do {
+            self.audioCache = try AudioCacheStorage()
+            self.offlinePackageStorage = try OfflineTourPackageStorage()
+        } catch {
+            print("Error initializing offline storage: \(error)")
+            fatalError("Failed to initialize offline storage: \(error)")
+        }
+
+        self.networkMonitor = NetworkConnectivityMonitor()
+        self.offlineDownloadManager = OfflineTourDownloadManager(
+            audioCache: audioCache,
+            packageStorage: offlinePackageStorage,
+            networkMonitor: networkMonitor
+        )
 
         // Load saved onboarding data - fast
         loadOnboardingData()

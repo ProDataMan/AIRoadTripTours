@@ -8,6 +8,11 @@ public struct AudioTourView: View {
     @State private var showMap = false
     @State private var currentWeather: WeatherForecast?
     @State private var isLoadingWeather = false
+    @State private var isStartingTour = false // Immediate flag to prevent double-tap
+
+    // Explicitly captured tour data for map (not relying on @Bindable observation)
+    @State private var mapPOIs: [POI] = []
+    @State private var mapSessions: [NarrationSession] = []
 
     private let weatherService = WeatherService()
     private let navigationService = NavigationService()
@@ -71,6 +76,60 @@ public struct AudioTourView: View {
                     .padding()
                 }
 
+                // Selected POIs list (show if POIs are selected and tour not prepared)
+                if !appState.selectedPOIs.isEmpty && !tourManager.isPrepared {
+                    VStack(alignment: .leading, spacing: 12) {
+                        // Tour Summary Header
+                        HStack(spacing: 16) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Tour Summary")
+                                    .font(.headline)
+                                HStack(spacing: 12) {
+                                    Label("\(appState.selectedPOIs.count) stops", systemImage: "mappin.and.ellipse")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+
+                                    if let userLocation = locationService.currentLocation {
+                                        let totalDistance = calculateTotalDistance(
+                                            from: userLocation,
+                                            pois: Array(appState.selectedPOIs)
+                                        )
+                                        Label(String(format: "~%.0f mi", totalDistance), systemImage: "road.lanes")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+
+                                        let estimatedDuration = Int(totalDistance / 45.0 * 60.0) // 45 mph avg
+                                        Label("~\(estimatedDuration) min", systemImage: "clock")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+
+                            Spacer()
+                        }
+
+                        Divider()
+
+                        // POI Cards Scroll View
+                        ScrollView {
+                            VStack(spacing: 12) {
+                                ForEach(Array(appState.selectedPOIs)) { poi in
+                                    AudioTourPOICard(
+                                        poi: poi,
+                                        referenceLocation: locationService.currentLocation
+                                    )
+                                }
+                            }
+                        }
+                        .frame(maxHeight: 300)
+                    }
+                    .padding()
+                    .background(.thinMaterial)
+                    .cornerRadius(12)
+                    .padding(.horizontal)
+                }
+
                 if tourManager.isGenerating {
                     VStack(spacing: 16) {
                         ProgressView()
@@ -86,140 +145,22 @@ public struct AudioTourView: View {
                     }
                     .padding()
                 } else {
-                    // Playback Controls
-                    VStack(spacing: 16) {
-                        if let narration = tourManager.currentNarration {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Now Playing")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-
-                                Text(narration.poiName)
-                                    .font(.title2)
-                                    .bold()
-
-                                Text(narration.title)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding()
-                            .background(.thinMaterial)
-                            .cornerRadius(12)
-                        }
-
-                        // Tour Status
-                        if tourManager.isPrepared {
-                            HStack(spacing: 12) {
-                                Image(systemName: statusIcon)
-                                    .font(.title2)
-                                    .foregroundStyle(statusColor)
-
-                                Text(statusText)
-                                    .font(.headline)
-                            }
-                            .padding()
-                            .frame(maxWidth: .infinity)
-                            .background(statusColor.opacity(0.1))
-                            .cornerRadius(8)
-                        }
-
-                        // Playback State
-                        if tourManager.playbackState != .idle && tourManager.playbackState != .preparing {
-                            HStack(spacing: 12) {
-                                Image(systemName: playbackStateIcon(tourManager.playbackState))
-                                    .font(.title2)
-                                    .foregroundStyle(playbackStateColor(tourManager.playbackState))
-
-                                Text(tourManager.playbackState.rawValue)
-                                    .font(.headline)
-                            }
-                            .padding()
-                            .frame(maxWidth: .infinity)
-                            .background(playbackStateColor(tourManager.playbackState).opacity(0.1))
-                            .cornerRadius(8)
-                        }
-
-                        // Control Buttons (only show when tour is active)
-                        if tourManager.isPrepared {
-                            HStack(spacing: 24) {
-                                Button {
-                                    Task { await tourManager.stopTour() }
-                                } label: {
-                                    Image(systemName: "stop.fill")
-                                        .font(.title)
-                                        .frame(width: 60, height: 60)
-                                        .background(.red.opacity(0.1))
-                                        .foregroundStyle(.red)
-                                        .cornerRadius(30)
-                                }
-
-                                Button {
-                                    Task { await tourManager.pauseResume() }
-                                } label: {
-                                    Image(systemName: playPauseIcon(tourManager.playbackState))
-                                        .font(.title)
-                                        .frame(width: 80, height: 80)
-                                        .background(.blue)
-                                        .foregroundStyle(.white)
-                                        .cornerRadius(40)
-                                }
-                                .disabled(tourManager.playbackState == .idle)
-
-                                Button {
-                                    Task { await tourManager.skip() }
-                                } label: {
-                                    Image(systemName: "forward.fill")
-                                        .font(.title)
-                                        .frame(width: 60, height: 60)
-                                        .background(.gray.opacity(0.1))
-                                        .foregroundStyle(.gray)
-                                        .cornerRadius(30)
-                                }
-                                .disabled(tourManager.playbackState == .idle || tourManager.playbackState == .completed)
-                            }
-                            .padding()
-                        }
-                    }
-
-                    Spacer()
-
-                    // Start Tour Button (only show when tour is not prepared)
-                    if !tourManager.isPrepared {
-                        Button {
-                            Task { await startAudioTour() }
-                        } label: {
-                            Label(
-                                appState.selectedPOIs.isEmpty ? "Start Audio Tour (All Nearby POIs)" : "Start Tour (\(appState.selectedPOIs.count) Selected)",
-                                systemImage: "play.circle.fill"
-                            )
-                                .font(.headline)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(canStartTour ? .green : .gray)
-                                .foregroundStyle(.white)
-                                .cornerRadius(12)
-                        }
-                        .padding(.horizontal)
-                        .disabled(!canStartTour)
-
-                        if locationService.currentLocation == nil {
-                            Text("Enable location access to start audio tour")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+                    playbackControlsView
                 }
 
                 // Show active tour view when playing
                 if tourManager.playbackState == .playing || tourManager.playbackState == .paused {
-                    ActiveTourView(
-                        narration: tourManager.currentNarration!,
-                        images: tourManager.getImagesForCurrentPOI()
-                    )
-                    .frame(height: 300)
-                    .cornerRadius(16)
-                    .padding(.horizontal)
+                    if let narration = tourManager.currentNarration {
+                        let images = tourManager.getImagesForCurrentPOI()
+                        let _ = print("🎨 ActiveTourView: narration=\(narration.poiName), images.count=\(images.count)")
+                        ActiveTourView(
+                            narration: narration,
+                            images: images
+                        )
+                        .frame(height: 300)
+                        .cornerRadius(16)
+                        .padding(.horizontal)
+                    }
                 }
             }
             .padding()
@@ -246,34 +187,20 @@ public struct AudioTourView: View {
                 }
             }
             .sheet(isPresented: $showMap) {
-                NavigationStack {
-                    #if canImport(MapKit)
-                    if #available(iOS 17.0, macOS 14.0, *) {
-                        TourMapView(
-                            pois: tourManager.currentPOIs,
-                            currentLocation: locationService.currentLocation,
-                            currentPOIIndex: tourManager.currentSessionIndex,
-                            sessions: tourManager.sessions
-                        )
-                        .navigationTitle("Tour Map")
-                        #if os(iOS)
-                        .navigationBarTitleDisplayMode(.inline)
-                        #endif
-                        .toolbar {
-                            ToolbarItem(placement: .primaryAction) {
-                                Button("Done") {
-                                    showMap = false
-                                }
-                            }
-                        }
-                    } else {
-                        Text("Map requires iOS 17.0+")
-                            .padding()
+                if #available(iOS 17.0, macOS 14.0, *) {
+                    MapSheetView(
+                        pois: mapPOIs,
+                        sessions: mapSessions,
+                        currentLocation: locationService.currentLocation,
+                        showMap: $showMap
+                    )
+                    .environment(appState)
+                    .onAppear {
+                        print("🗺️ 🚨 SHEET PRESENTATION TRIGGERED - showMap=\(showMap), mapPOIs.count=\(mapPOIs.count)")
                     }
-                    #else
-                    Text("Map not available on this platform")
+                } else {
+                    Text("Map requires iOS 17.0+")
                         .padding()
-                    #endif
                 }
             }
             .task {
@@ -304,6 +231,139 @@ public struct AudioTourView: View {
                         await fetchWeather(for: location)
                     }
                 }
+            }
+            .onChange(of: showMap) { oldValue, newValue in
+                print("🗺️ 🚨 showMap CHANGED: \(oldValue) → \(newValue), mapPOIs.count=\(mapPOIs.count), mapSessions.count=\(mapSessions.count)")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var playbackControlsView: some View {
+        // Playback Controls
+        VStack(spacing: 16) {
+            if let narration = tourManager.currentNarration {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Now Playing")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Text(narration.poiName)
+                        .font(.title2)
+                        .bold()
+
+                    Text(narration.title)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(.thinMaterial)
+                .cornerRadius(12)
+            }
+
+            // Tour Status
+            if tourManager.isPrepared {
+                HStack(spacing: 12) {
+                    Image(systemName: statusIcon)
+                        .font(.title2)
+                        .foregroundStyle(statusColor)
+
+                    Text(statusText)
+                        .font(.headline)
+                }
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(statusColor.opacity(0.1))
+                .cornerRadius(8)
+            }
+
+            // Playback State
+            if tourManager.playbackState != .idle && tourManager.playbackState != .preparing {
+                HStack(spacing: 12) {
+                    Image(systemName: playbackStateIcon(tourManager.playbackState))
+                        .font(.title2)
+                        .foregroundStyle(playbackStateColor(tourManager.playbackState))
+
+                    Text(tourManager.playbackState.rawValue)
+                        .font(.headline)
+                }
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(playbackStateColor(tourManager.playbackState).opacity(0.1))
+                .cornerRadius(8)
+            }
+
+            // Control Buttons (only show when tour is active)
+            if tourManager.isPrepared {
+                HStack(spacing: 24) {
+                    Button {
+                        Task { await tourManager.stopTour() }
+                    } label: {
+                        Image(systemName: "stop.fill")
+                            .font(.title)
+                            .frame(width: 60, height: 60)
+                            .background(.red.opacity(0.1))
+                            .foregroundStyle(.red)
+                            .cornerRadius(30)
+                    }
+
+                    Button {
+                        Task { await tourManager.pauseResume() }
+                    } label: {
+                        Image(systemName: playPauseIcon(tourManager.playbackState))
+                            .font(.title)
+                            .frame(width: 80, height: 80)
+                            .background(.blue)
+                            .foregroundStyle(.white)
+                            .cornerRadius(40)
+                    }
+                    .disabled(tourManager.playbackState == .idle)
+
+                    Button {
+                        Task { await tourManager.skip() }
+                    } label: {
+                        Image(systemName: "forward.fill")
+                            .font(.title)
+                            .frame(width: 60, height: 60)
+                            .background(.gray.opacity(0.1))
+                            .foregroundStyle(.gray)
+                            .cornerRadius(30)
+                    }
+                    .disabled(tourManager.playbackState == .idle || tourManager.playbackState == .completed)
+                }
+                .padding()
+            }
+        }
+
+        Spacer()
+
+        // Start Tour Button (only show when tour is not prepared)
+        if !tourManager.isPrepared {
+            Button {
+                // Set flag immediately to prevent double-tap
+                guard !isStartingTour else { return }
+                isStartingTour = true
+                Task { await startAudioTour() }
+            } label: {
+                Label(
+                    appState.selectedPOIs.isEmpty ? "Start Audio Tour (All Nearby POIs)" : "Start Tour (\(appState.selectedPOIs.count) Selected)",
+                    systemImage: "play.circle.fill"
+                )
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background((canStartTour && !isStartingTour) ? .green : .gray)
+                    .foregroundStyle(.white)
+                    .cornerRadius(12)
+            }
+            .padding(.horizontal)
+            .disabled(!canStartTour || tourManager.isGenerating || isStartingTour)
+
+            if locationService.currentLocation == nil {
+                Text("Enable location access to start audio tour")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -365,49 +425,87 @@ public struct AudioTourView: View {
     }
 
     private func startAudioTour() async {
+        print("🎯 Start Audio Tour button pressed")
+
+        // Reset flag when function exits (success or error)
+        defer {
+            isStartingTour = false
+        }
+
         guard let userLocation = locationService.currentLocation else {
+            print("❌ No location available")
             return
         }
+
+        print("✅ Location available: \(userLocation.latitude), \(userLocation.longitude)")
 
         // Start generating immediately with loading state
         tourManager.isGenerating = true
 
-        Task {
-            do {
-                // Use selected POIs if any, otherwise find nearby POIs
-                let pois: [POI]
-                if !appState.selectedPOIs.isEmpty {
-                    // Use selected POIs and optimize route
-                    let optimizer = RouteOptimizer()
-                    pois = await optimizer.optimizeRoute(
-                        startingFrom: userLocation,
-                        visiting: Array(appState.selectedPOIs)
-                    )
-                } else {
-                    // Find all nearby POIs and optimize route
-                    let nearbyPOIs = try await appState.poiRepository.findNearby(
-                        location: userLocation,
-                        radiusMiles: 25.0,
-                        categories: nil
-                    )
-
-                    let optimizer = RouteOptimizer()
-                    pois = await optimizer.optimizeRoute(
-                        startingFrom: userLocation,
-                        visiting: Array(nearbyPOIs.prefix(5))
-                    )
-                }
-
-                // Start tour with manager
-                await tourManager.startTour(
-                    pois: pois,
-                    userInterests: appState.currentUser?.interests ?? []
+        do {
+            print("🔍 Getting POIs...")
+            // Use selected POIs if any, otherwise find nearby POIs
+            let pois: [POI]
+            if !appState.selectedPOIs.isEmpty {
+                print("📍 Using \(appState.selectedPOIs.count) selected POIs")
+                // Use selected POIs and optimize route
+                let optimizer = RouteOptimizer()
+                pois = await optimizer.optimizeRoute(
+                    startingFrom: userLocation,
+                    visiting: Array(appState.selectedPOIs)
                 )
+            } else {
+                print("🔎 Finding nearby POIs...")
+                // Find all nearby POIs and optimize route
+                let nearbyPOIs = try await appState.poiRepository.findNearby(
+                    location: userLocation,
+                    radiusMiles: 25.0,
+                    categories: nil
+                )
+                print("📍 Found \(nearbyPOIs.count) nearby POIs")
 
-            } catch {
-                print("Error starting audio tour: \(error)")
-                tourManager.isGenerating = false
+                let optimizer = RouteOptimizer()
+                pois = await optimizer.optimizeRoute(
+                    startingFrom: userLocation,
+                    visiting: Array(nearbyPOIs.prefix(5))
+                )
             }
+
+            print("🚀 Preparing tour with \(pois.count) POIs...")
+
+            // Prepare tour and get data directly
+            let (preparedPOIs, preparedSessions) = await tourManager.prepareTour(
+                pois: pois,
+                userInterests: appState.currentUser?.interests ?? []
+            )
+
+            // Use the returned data (doesn't rely on property reads)
+            mapPOIs = preparedPOIs
+            mapSessions = preparedSessions
+            print("🗺️ 📸 Snapshot captured: mapPOIs.count=\(mapPOIs.count), mapSessions.count=\(mapSessions.count)")
+
+            // Open map if we have POIs
+            if !mapPOIs.isEmpty {
+                print("🗺️ 🚨 Opening map with \(mapPOIs.count) POIs")
+                showMap = true
+            }
+
+            print("✅ Tour prepared successfully")
+
+            // Play welcome introduction in background (map is already visible)
+            print("🔊 Starting welcome introduction (background)")
+            Task {
+                await tourManager.playWelcomeIntroduction(
+                    poiCount: preparedPOIs.count,
+                    sessionsToIntroduce: preparedSessions
+                )
+                print("🔊 Welcome introduction completed")
+            }
+
+        } catch {
+            print("❌ Error starting audio tour: \(error)")
+            tourManager.isGenerating = false
+            showMap = false // Close map if error
         }
     }
 
@@ -436,6 +534,20 @@ public struct AudioTourView: View {
             print("Error fetching weather: \(error)")
             currentWeather = nil
         }
+    }
+
+    private func calculateTotalDistance(from start: GeoLocation, pois: [POI]) -> Double {
+        guard !pois.isEmpty else { return 0 }
+
+        var total = 0.0
+        var current = start
+
+        for poi in pois {
+            total += current.distance(to: poi.location)
+            current = poi.location
+        }
+
+        return total
     }
 }
 
@@ -585,6 +697,205 @@ struct PhaseBadge: View {
         case .arrival: return .green
         case .guidedTour: return .purple
         case .passed: return .secondary
+        }
+    }
+}
+
+// MARK: - Audio Tour POI Card
+
+struct AudioTourPOICard: View {
+    let poi: POI
+    let referenceLocation: GeoLocation?
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            // POI Icon
+            Image(systemName: categoryIcon(for: poi.category))
+                .font(.title2)
+                .foregroundStyle(.blue)
+                .frame(width: 50, height: 50)
+                .background(.blue.opacity(0.1))
+                .cornerRadius(8)
+
+            VStack(alignment: .leading, spacing: 6) {
+                // Name with open status
+                HStack(spacing: 4) {
+                    Text(poi.name)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .lineLimit(2)
+
+                    if let hours = poi.hours, let isOpen = hours.isOpenNow {
+                        Circle()
+                            .fill(isOpen ? .green : .red)
+                            .frame(width: 5, height: 5)
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    Label(poi.category.rawValue, systemImage: "tag")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    if let location = referenceLocation {
+                        let distance = location.distance(to: poi.location)
+                        Label(formatDistance(distance), systemImage: "location")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if let rating = poi.rating {
+                        HStack(spacing: 2) {
+                            Image(systemName: "star.fill")
+                                .font(.caption)
+                            Text(String(format: "%.1f", rating.averageRating))
+                                .font(.caption)
+                        }
+                        .foregroundStyle(.orange)
+                    }
+                }
+
+                // Price level
+                if let rating = poi.rating, let priceLevel = rating.priceLevel {
+                    Text(String(repeating: "$", count: priceLevel))
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                        .fontWeight(.semibold)
+                }
+
+                if let description = poi.description, !description.isEmpty {
+                    Text(description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+
+                // Contact info
+                HStack(spacing: 8) {
+                    if let phone = poi.contact?.phone {
+                        HStack(spacing: 2) {
+                            Image(systemName: "phone.fill")
+                                .font(.caption2)
+                            Text(formatPhone(phone))
+                                .font(.caption2)
+                        }
+                        .foregroundStyle(.blue)
+                    }
+
+                    if poi.contact?.website != nil {
+                        Image(systemName: "globe")
+                            .font(.caption2)
+                            .foregroundStyle(.blue)
+                    }
+                }
+            }
+
+            Spacer()
+        }
+        .padding()
+        .background(.background)
+        .cornerRadius(8)
+    }
+
+    private func categoryIcon(for category: POICategory) -> String {
+        switch category {
+        case .museum: return "building.columns"
+        case .park: return "tree"
+        case .historicSite: return "map"
+        case .waterfall: return "water.waves"
+        case .beach: return "beach.umbrella"
+        case .lake: return "water.waves"
+        case .hiking: return "figure.hiking"
+        case .scenic: return "eye"
+        case .restaurant: return "fork.knife"
+        case .cafe: return "cup.and.saucer"
+        case .hotel: return "bed.double"
+        case .evCharger: return "bolt.car"
+        case .attraction: return "star"
+        case .shopping: return "cart"
+        case .entertainment: return "popcorn"
+        }
+    }
+
+    private func formatDistance(_ miles: Double) -> String {
+        if miles < 0.1 {
+            return "< 0.1 mi"
+        } else if miles < 10 {
+            return String(format: "%.1f mi", miles)
+        } else {
+            return String(format: "%.0f mi", miles)
+        }
+    }
+
+    private func formatPhone(_ phone: String) -> String {
+        let digits = phone.filter { $0.isNumber }
+        if digits.count == 10 {
+            let area = digits.prefix(3)
+            let prefix = digits.dropFirst(3).prefix(3)
+            let line = digits.suffix(4)
+            return "(\(area)) \(prefix)-\(line)"
+        }
+        return phone
+    }
+}
+
+// MARK: - Map Sheet View
+
+@available(iOS 17.0, macOS 14.0, *)
+struct MapSheetView: View {
+    // Explicitly passed POIs/sessions (snapshot when map opens)
+    let pois: [POI]
+    let sessions: [NarrationSession]
+
+    // Access tourManager from environment for currentSessionIndex
+    @Environment(AppState.self) private var appState
+    let currentLocation: GeoLocation?
+    @Binding var showMap: Bool
+
+    // Track introducingPOIIndex via NotificationCenter (workaround for broken @Observable across sheets)
+    @State private var introducingPOIIndex: Int? = nil
+
+    var body: some View {
+        // Read from environment tourManager for currentSessionIndex
+        let tourManager = appState.audioTourManager
+        let currentIndex = tourManager.currentSessionIndex
+
+        let _ = print("🗺️ 🚨 MapSheetView.body RENDERING: pois=\(pois.count), sessions=\(sessions.count), currentIdx=\(currentIndex), introducing=\(String(describing: introducingPOIIndex))")
+
+        NavigationStack {
+            #if canImport(MapKit)
+            TourMapView(
+                pois: pois,
+                sessions: sessions,
+                introducingPOIIndex: introducingPOIIndex,
+                currentSessionIndex: currentIndex,
+                currentLocation: currentLocation
+            )
+            .navigationTitle("Tour Map")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Done") {
+                        showMap = false
+                    }
+                }
+            }
+            #else
+            Text("Map not available on this platform")
+                .padding()
+            #endif
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("IntroducingPOIIndexChanged"))) { notification in
+            print("🗺️ MapSheetView: Received notification")
+            if let index = notification.userInfo?["index"] as? Int {
+                print("🗺️ MapSheetView: Updating introducingPOIIndex to \(index)")
+                introducingPOIIndex = index
+            } else {
+                print("🗺️ MapSheetView: Updating introducingPOIIndex to nil")
+                introducingPOIIndex = nil
+            }
         }
     }
 }

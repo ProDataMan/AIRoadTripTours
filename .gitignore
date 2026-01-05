@@ -7,6 +7,11 @@ DerivedData/
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
 
+# Environment files with API keys
+.env
+.env.local
+.env.*.local
+
 # Xcode - Ignore most xcodeproj content but keep shared data
 *.xcodeproj/*
 !*.xcodeproj/project.pbxproj

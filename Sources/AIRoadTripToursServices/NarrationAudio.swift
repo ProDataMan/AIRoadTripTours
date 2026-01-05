@@ -19,8 +19,9 @@ public final class AVSpeechNarrationAudioService: NSObject, NarrationAudioServic
     private var currentUtterance: AVSpeechUtterance?
     private var _currentNarration: Narration?
     private var _playbackState: NarrationPlaybackState = .idle
+    private var speechContinuation: CheckedContinuation<Void, Error>?
 
-    /// Voice to use for synthesis (defaults to system default).
+    /// Voice to use for synthesis (defaults to best available).
     public var voice: AVSpeechSynthesisVoice?
 
     /// Speech rate (0.0 = slowest, 1.0 = fastest, default 0.5).
@@ -34,6 +35,12 @@ public final class AVSpeechNarrationAudioService: NSObject, NarrationAudioServic
 
     public override init() {
         self.synthesizer = AVSpeechSynthesizer()
+
+        // Automatically select best available voice
+        if #available(iOS 17.0, macOS 14.0, *) {
+            self.voice = VoiceConfiguration.getBestVoice(language: "en-US", quality: .enhanced)
+        }
+
         super.init()
         self.synthesizer.delegate = self
         setupRemoteCommands()
@@ -57,7 +64,11 @@ public final class AVSpeechNarrationAudioService: NSObject, NarrationAudioServic
         }
 
         // Configure audio session for background playback
-        try configureAudioSession()
+        do {
+            try configureAudioSession()
+        } catch {
+            throw error
+        }
 
         // Create and speak utterance
         _currentNarration = narration
@@ -68,7 +79,13 @@ public final class AVSpeechNarrationAudioService: NSObject, NarrationAudioServic
         updateNowPlayingInfo(for: narration)
 
         _playbackState = .playing
-        synthesizer.speak(utterance)
+
+        // Wait for speech to complete using continuation
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            // Store continuation to be resumed by delegate
+            self.speechContinuation = continuation
+            synthesizer.speak(utterance)
+        }
     }
 
     public func pause() async {
@@ -102,7 +119,16 @@ public final class AVSpeechNarrationAudioService: NSObject, NarrationAudioServic
 
     private func createUtterance(for narration: Narration) -> AVSpeechUtterance {
         let utterance = AVSpeechUtterance(string: narration.content)
-        utterance.voice = voice ?? AVSpeechSynthesisVoice(language: "en-US")
+
+        // Use configured voice or fallback to best available
+        if let configuredVoice = voice {
+            utterance.voice = configuredVoice
+        } else if #available(iOS 17.0, macOS 14.0, *) {
+            utterance.voice = VoiceConfiguration.getBestVoice(language: "en-US", quality: .enhanced)
+        } else {
+            utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+        }
+
         utterance.rate = rate
         utterance.pitchMultiplier = pitchMultiplier
         utterance.volume = volume
@@ -114,9 +140,10 @@ public final class AVSpeechNarrationAudioService: NSObject, NarrationAudioServic
         do {
             // Use .playback category to enable background audio
             // .mixWithOthers allows other audio to play alongside
-            try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers, .allowBluetooth, .allowBluetoothA2DP])
-            try session.setActive(true)
-        } catch {
+            // Simplified options to avoid compatibility issues
+            try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+            try session.setActive(true, options: [])
+        } catch let error as NSError {
             throw NarrationAudioError.audioSessionFailure(error.localizedDescription)
         }
     }
@@ -193,6 +220,12 @@ extension AVSpeechNarrationAudioService: AVSpeechSynthesizerDelegate {
             _playbackState = .completed
             _currentNarration = nil
             currentUtterance = nil
+
+            // Resume continuation if waiting
+            if let continuation = speechContinuation {
+                speechContinuation = nil
+                continuation.resume()
+            }
         }
     }
 
@@ -222,6 +255,12 @@ extension AVSpeechNarrationAudioService: AVSpeechSynthesizerDelegate {
             _playbackState = .idle
             _currentNarration = nil
             currentUtterance = nil
+
+            // Resume continuation with cancellation error if waiting
+            if let continuation = speechContinuation {
+                speechContinuation = nil
+                continuation.resume(throwing: NarrationAudioError.playbackFailure("Speech was cancelled"))
+            }
         }
     }
 }

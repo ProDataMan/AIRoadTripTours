@@ -9,6 +9,7 @@ public struct ToursView: View {
     @State private var tourToDelete: Tour?
     @State private var showDeleteConfirmation = false
     @State private var searchText = ""
+    @State private var showOfflineDownloads = false
 
     private let storage = TourStorage()
 
@@ -27,6 +28,14 @@ public struct ToursView: View {
             }
             .navigationTitle("Tours")
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button {
+                        showOfflineDownloads = true
+                    } label: {
+                        Label("Offline Downloads", systemImage: "arrow.down.circle")
+                    }
+                }
+
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         showCreateTourSheet = true
@@ -47,6 +56,14 @@ public struct ToursView: View {
                         showCreateTourSheet = false
                     }
                 )
+            }
+            .sheet(isPresented: $showOfflineDownloads) {
+                NavigationStack {
+                    OfflineDownloadsView(
+                        downloadManager: appState.offlineDownloadManager,
+                        networkMonitor: appState.networkMonitor
+                    )
+                }
             }
             .confirmationDialog(
                 "Delete Tour?",

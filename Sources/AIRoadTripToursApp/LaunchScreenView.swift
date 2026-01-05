@@ -16,11 +16,31 @@ public struct LaunchScreenView: View {
 
             // Video player
             if let player = player {
+                #if os(iOS)
                 VideoPlayer(player: player) {
                     // No controls
                 }
                 .disabled(true)
                 .ignoresSafeArea()
+                #else
+                // macOS fallback - show static content
+                VStack(spacing: 30) {
+                    Image(systemName: "car.fill")
+                        .font(.system(size: 100))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue, .cyan],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+
+                    Text("AI Road Trip Tours")
+                        .font(.system(size: 40, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                }
+                #endif
             } else {
                 // Fallback while video loads
                 VStack(spacing: 30) {

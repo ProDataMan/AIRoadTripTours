@@ -247,6 +247,8 @@ public struct POIDetailView: View {
             appState.selectedPOIs.remove(poi)
         } else {
             appState.selectedPOIs.insert(poi)
+            // Dismiss back to Discover page after adding to tour
+            dismiss()
         }
     }
 
