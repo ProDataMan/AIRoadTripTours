@@ -1,6 +1,19 @@
 # Session Continuation - Map Zoom During POI Introduction Fix
 
-## Status: Build SUCCESSFUL - NotificationCenter Solution Implemented
+## Status: COMPLETE ✅ - Committed and Pushed
+
+### Latest Changes (2026-01-05)
+1. ✅ **NotificationCenter Solution** - Committed (d1d556d) and pushed
+   - Implements workaround for SwiftUI @Observable observation limitation across sheet boundaries
+   - Map now zooms correctly when POIs are introduced during narration
+   - Yellow highlight circle appears/moves dynamically with narration
+
+2. ✅ **Tighter Zoom Level** - Committed (c82c855) and pushed
+   - Reduced zoom from 0.02° to 0.003° (6.7x tighter)
+   - Provides very tight street-level view showing POI within ~half a block
+   - Located in TourMapView.swift line 266
+
+## Previous Status: Build SUCCESSFUL - NotificationCenter Solution Implemented
 
 ## Final Solution: NotificationCenter (Workaround for SwiftUI Limitation)
 
