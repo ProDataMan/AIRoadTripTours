@@ -186,23 +186,45 @@ public struct AudioTourView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showMap) {
-                if #available(iOS 17.0, macOS 14.0, *) {
+            #if os(iOS)
+            .fullScreenCover(isPresented: $showMap) {
+                if #available(iOS 17.0, *) {
                     MapSheetView(
                         pois: mapPOIs,
                         sessions: mapSessions,
                         currentLocation: locationService.currentLocation,
-                        showMap: $showMap
+                        showMap: $showMap,
+                        tourManager: appState.audioTourManager
                     )
                     .environment(appState)
                     .onAppear {
-                        print("🗺️ 🚨 SHEET PRESENTATION TRIGGERED - showMap=\(showMap), mapPOIs.count=\(mapPOIs.count)")
+                        print("🗺️ 🚨 FULL SCREEN MAP PRESENTATION - showMap=\(showMap), mapPOIs.count=\(mapPOIs.count)")
                     }
                 } else {
                     Text("Map requires iOS 17.0+")
                         .padding()
                 }
             }
+            #else
+            .sheet(isPresented: $showMap) {
+                if #available(macOS 14.0, *) {
+                    MapSheetView(
+                        pois: mapPOIs,
+                        sessions: mapSessions,
+                        currentLocation: locationService.currentLocation,
+                        showMap: $showMap,
+                        tourManager: appState.audioTourManager
+                    )
+                    .environment(appState)
+                    .onAppear {
+                        print("🗺️ 🚨 SHEET MAP PRESENTATION - showMap=\(showMap), mapPOIs.count=\(mapPOIs.count)")
+                    }
+                } else {
+                    Text("Map requires macOS 14.0+")
+                        .padding()
+                }
+            }
+            #endif
             .task {
                 locationService.requestLocationPermission()
                 await tourManager.startMonitoring()
@@ -338,8 +360,9 @@ public struct AudioTourView: View {
 
         Spacer()
 
-        // Start Tour Button (only show when tour is not prepared)
+        // Show different buttons based on tour state
         if !tourManager.isPrepared {
+            // Start Tour Button (only show when tour is not prepared)
             Button {
                 // Set flag immediately to prevent double-tap
                 guard !isStartingTour else { return }
@@ -365,6 +388,39 @@ public struct AudioTourView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+        } else if tourManager.playbackState == .paused || tourManager.playbackState == .idle {
+            // Continue Tour and Cancel Tour buttons side by side when paused
+            HStack(spacing: 16) {
+                // Cancel Tour Button
+                Button {
+                    Task { await tourManager.stopTour() }
+                } label: {
+                    Label("Cancel Tour", systemImage: "xmark.circle.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(.red)
+                        .foregroundStyle(.white)
+                        .cornerRadius(12)
+                }
+
+                // Continue Tour Button
+                Button {
+                    Task {
+                        await tourManager.pauseResume()
+                        showMap = true
+                    }
+                } label: {
+                    Label("Continue Tour", systemImage: "play.circle.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(.green)
+                        .foregroundStyle(.white)
+                        .cornerRadius(12)
+                }
+            }
+            .padding(.horizontal)
         }
     }
 
@@ -847,17 +903,14 @@ struct MapSheetView: View {
     let pois: [POI]
     let sessions: [NarrationSession]
 
-    // Access tourManager from environment for currentSessionIndex
-    @Environment(AppState.self) private var appState
     let currentLocation: GeoLocation?
     @Binding var showMap: Bool
+    let tourManager: AudioTourManager
 
     // Track introducingPOIIndex via NotificationCenter (workaround for broken @Observable across sheets)
     @State private var introducingPOIIndex: Int? = nil
 
     var body: some View {
-        // Read from environment tourManager for currentSessionIndex
-        let tourManager = appState.audioTourManager
         let currentIndex = tourManager.currentSessionIndex
 
         let _ = print("🗺️ 🚨 MapSheetView.body RENDERING: pois=\(pois.count), sessions=\(sessions.count), currentIdx=\(currentIndex), introducing=\(String(describing: introducingPOIIndex))")
@@ -878,6 +931,10 @@ struct MapSheetView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button("Done") {
+                        // Pause the tour when Done is clicked
+                        Task {
+                            await tourManager.pauseResume()
+                        }
                         showMap = false
                     }
                 }
